@@ -1,0 +1,78 @@
+name: achero_player
+description: "Achero Player — 跨平台、可插拔、深度可定制的 Flutter 音乐播放器。支持 Windows / Linux / Android / Web。"
+publish_to: 'none'
+
+version: 1.0.2+2
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI 图标
+  cupertino_icons: ^1.0.8
+
+  # 状态管理：以极小的样板代码把服务注入 widget 树
+  provider: ^6.1.2
+
+  # 音频播放：libmpv/ffmpeg 后端，Windows/Linux/Android 原生支持 OGG/Opus/FLAC，
+  # Web 回退到浏览器 HTML5 音频（不再受 Media Foundation 限制）
+  media_kit: ^1.1.1
+  media_kit_libs_audio: ^1.0.0
+
+  # 本地持久化：设置、播放列表、插件数据
+  shared_preferences: ^2.3.2
+
+  # 运行时目录定位（桌面/移动端）
+  path_provider: ^2.1.5
+
+  # 跨平台路径拼接/解析
+  path: ^1.9.0
+
+  # 选择音频文件/目录（桌面选目录、Web 选文件）
+  file_picker: ^8.1.4
+
+  # RPC 音乐服务器源插件使用的 HTTP 客户端（JSON-RPC 2.0 over HTTP）
+  http: ^1.2.0
+
+  # Subsonic/OpenSubsonic 音乐服务器鉴权需要 MD5（token = md5(password + salt)）
+  crypto: ^3.0.3
+
+  # 运行时脚本插件引擎：在 Dart 内解释执行 Dart 子集（插件为独立 .dart 文件）
+  dart_eval: ^0.8.5
+
+  # 桌面歌词独立窗口：多窗口 + 窗口属性（仅 Windows / Linux / macOS）
+  desktop_multi_window: ^0.3.0
+  window_manager: ^0.5.2
+
+  # 调色盘：HSV 色轮 + 滑块的颜色选择器
+  flutter_colorpicker: ^1.1.0
+
+  # 老式中文 .lrc 歌词常为 GBK 编码，UTF-8 解码失败时回退到 GBK
+  fast_gbk: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+# 修复 media_kit_libs_windows_audio 1.0.9 与 CMake 4.x（VS 2026）不兼容：
+# 其 CMakeLists 用 `tar xzf`（gzip）解压 .7z 会失败。此处指向本地打了补丁的副本
+# （third_party/ 下，已改为 `tar xf` 并补上 POST_BUILD），待上游修复后可删除。
+dependency_overrides:
+  media_kit_libs_windows_audio:
+    path: third_party/media_kit_libs_windows_audio
+
+flutter:
+  uses-material-design: true
+
+  # 运行时脚本插件（作为 assets 打包，首次运行复制到插件目录；Web 端直接加载）。
+  assets:
+    - assets/plugins/
+    - assets/images/   # 作者头像 author_avatar.png
+
+  # 说明：若要内置字体，请把 .ttf/.otf 放入 assets/fonts/ 并在此声明，
+  # 示例见 docs/THEME.md。运行时字体则把 .ttf/.otf 拖入数据目录 fonts/
+  # 即可自动识别（无需重新编译）。
