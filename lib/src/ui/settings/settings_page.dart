@@ -102,10 +102,10 @@ class _AboutTile extends StatelessWidget {
         onTap: () => showAboutDialog(
           context: context,
           applicationName: 'Achero Player',
-          applicationVersion: '1.0.2',
+          applicationVersion: '1.0.3',
           applicationIcon: const CircleAvatar(
             radius: 24,
-            foregroundImage: AssetImage('assets/images/author_avatar.png'),
+            foregroundImage: AssetImage('assets/images/bishop9910.png'),
             child: Icon(Icons.music_note),
           ),
           applicationLegalese: '一个可深度自定义、支持插件的跨平台音乐播放器。',
@@ -117,7 +117,7 @@ class _AboutTile extends StatelessWidget {
               CircleAvatar(
                 radius: 26,
                 foregroundImage:
-                    const AssetImage('assets/images/author_avatar.png'),
+                    const AssetImage('assets/images/bishop9910.jpg'),
                 child: const Icon(Icons.person),
               ),
               const SizedBox(width: 16),
@@ -134,7 +134,7 @@ class _AboutTile extends StatelessWidget {
                     Text(authorName,
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 2),
-                    Text('v1.0.2 · 纯 Dart · 跨平台 · 可插拔',
+                    Text('v1.0.3 跨平台 · 可插拔',
                         style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),

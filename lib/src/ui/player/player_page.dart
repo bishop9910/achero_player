@@ -52,6 +52,8 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
           const SizedBox(height: 4),
           _Controls(player: player),
+          const SizedBox(height: 4),
+          _VolumeControl(player: player),
           if (registry.playerWidgets.isNotEmpty)
             _PluginPanels(widgets: registry.playerWidgets),
           const SizedBox(height: 8),
@@ -199,9 +201,69 @@ class _Controls extends StatelessWidget {
   }
 }
 
+class _VolumeControl extends StatefulWidget {
+  const _VolumeControl({required this.player});
+
+  final PlayerController player;
+
+  @override
+  State<_VolumeControl> createState() => _VolumeControlState();
+}
+
+class _VolumeControlState extends State<_VolumeControl> {
+  double? _dragValue;
+  double _lastVolume = 1.0;
+
+  IconData _iconFor(double v) {
+    if (v <= 0) return Icons.volume_off;
+    if (v < 0.5) return Icons.volume_down;
+    return Icons.volume_up;
+  }
+
+  void _toggleMute() {
+    final v = widget.player.volume;
+    if (v > 0) {
+      _lastVolume = v;
+      widget.player.setVolume(0);
+    } else {
+      widget.player.setVolume(_lastVolume <= 0 ? 1.0 : _lastVolume);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final player = widget.player;
+    final shown = _dragValue ?? player.volume;
+    return Row(
+      children: [
+        IconButton(
+          tooltip: shown <= 0 ? '取消静音' : '静音',
+          icon: Icon(_iconFor(shown), color: scheme.onSurfaceVariant),
+          onPressed: _toggleMute,
+        ),
+        Expanded(
+          child: Slider(
+            value: shown,
+            onChangeStart: (v) => setState(() => _dragValue = v),
+            onChanged: (v) {
+              setState(() => _dragValue = v);
+              if (v > 0) _lastVolume = v;
+              player.setVolume(v, persist: false);
+            },
+            onChangeEnd: (v) {
+              setState(() => _dragValue = null);
+              player.setVolume(v);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PluginPanels extends StatelessWidget {
   const _PluginPanels({required this.widgets});
-
   final List<PlayerWidget> widgets;
 
   @override

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -55,19 +56,87 @@ class ScriptPluginLoader {
     return p.join(dir.path, 'plugins');
   }
 
-  /// 把内置脚本复制到插件目录（已存在则跳过），便于用户查看 / 修改 / 删除。
+  /// 把内置脚本同步到插件目录（带哈希自动更新）。
+  ///
+  /// 策略：记录每个内置脚本上次「播种」的 SHA256。启动时对比：
+  /// * 插件目录无此文件 → 复制内置版并记录哈希；
+  /// * 文件哈希 == 记录的哈希（用户没改过）→ 若内置版更新了则覆盖；
+  /// * 文件哈希 != 记录的哈希（用户改过）→ 保留用户版本。
   Future<void> _seedBundled(String dir) async {
+    final meta = await _readMeta(dir);
+    var metaChanged = false;
+
     for (final asset in bundledAssets) {
       final name = asset.split('/').last;
-      final target = '$dir/$name';
-      if (await _fs.exists(target)) continue;
+      final target = p.join(dir, name);
       try {
-        await _fs.writeBytes(target, utf8.encode(await rootBundle.loadString(asset)));
+        final bundled = await rootBundle.loadString(asset);
+        final bundledHash = _sha256(bundled);
+
+        if (!await _fs.exists(target)) {
+          await _fs.writeBytes(target, utf8.encode(bundled));
+          meta[name] = bundledHash;
+          metaChanged = true;
+          continue;
+        }
+
+        final existingBytes = await _fs.readBytes(target);
+        if (existingBytes == null) {
+          await _fs.writeBytes(target, utf8.encode(bundled));
+          meta[name] = bundledHash;
+          metaChanged = true;
+          continue;
+        }
+
+        final existingHash = _sha256(utf8.decode(existingBytes));
+        final lastSeeded = meta[name];
+
+        if (lastSeeded == null) {
+          // 旧版升级而来，无历史哈希：直接采用内置版。
+          await _fs.writeBytes(target, utf8.encode(bundled));
+          meta[name] = bundledHash;
+          metaChanged = true;
+        } else if (existingHash == lastSeeded) {
+          // 用户未修改：内置版有更新则覆盖。
+          if (bundledHash != lastSeeded) {
+            await _fs.writeBytes(target, utf8.encode(bundled));
+            meta[name] = bundledHash;
+            metaChanged = true;
+            debugPrint('[ScriptPluginLoader] 已更新内置脚本：$name');
+          }
+        } else {
+          // 用户修改过：保留。
+          debugPrint('[ScriptPluginLoader] 保留用户修改的脚本：$name');
+        }
       } catch (_) {
-        // 忽略复制失败（例如 Web 无此路径）。
+        // 忽略单个脚本失败。
       }
     }
+
+    if (metaChanged) await _writeMeta(dir, meta);
   }
+
+  Future<Map<String, String>> _readMeta(String dir) async {
+    final path = p.join(dir, '.achero_scripts.json');
+    final bytes = await _fs.readBytes(path);
+    if (bytes == null) return {};
+    try {
+      final decoded = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _writeMeta(String dir, Map<String, String> meta) async {
+    await _fs.writeBytes(
+      p.join(dir, '.achero_scripts.json'),
+      utf8.encode(jsonEncode(meta)),
+    );
+  }
+
+  String _sha256(String source) =>
+      sha256.convert(utf8.encode(source)).toString();
 
   void _register(PluginRegistry registry, String source, String sourceName) {
     try {

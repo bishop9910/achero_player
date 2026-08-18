@@ -32,6 +32,17 @@ class ThemeFactory {
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       visualDensity: VisualDensity.adaptivePlatformDensity,
+      // 轻量页面过渡：默认的缩放过渡（Zoom）在透明背景/壁纸下容易掉帧，
+      // 换成「淡入 + 轻微上移」，开销小很多。
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
     );
 
     final textTheme = base.textTheme.apply(

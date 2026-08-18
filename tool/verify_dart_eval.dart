@@ -47,14 +47,14 @@ void main() {
   stats.invoke('onEvent', ['trackStarted', jsonEncode({'id': 't1', 'title': '海阔天空'})]);
   stats.invoke('onEvent', ['trackStarted', jsonEncode({'id': 't2', 'title': '光辉岁月'})]);
 
-  final descRows = jsonDecode(stats.invoke('pageRows', ['desc']).toString()) as List<dynamic>;
-  assert(descRows.length == 2, 'expected 2 rows, got ${descRows.length}');
-  assert((descRows[0] as Map)['title'] == '海阔天空', 'desc top row should be 海阔天空');
-  assert((descRows[0] as Map)['trailing'] == '2 次');
-
-  final ascRows = jsonDecode(stats.invoke('pageRows', ['asc']).toString()) as List<dynamic>;
-  assert((ascRows[0] as Map)['title'] == '光辉岁月', 'asc top row should be 光辉岁月');
-  print('[stats] pageRows OK (desc/asc): $descRows / $ascRows');
+  // 排序已移到宿主侧，脚本只负责返回带 sortValue 的行。
+  final rows = jsonDecode(stats.invoke('pageRows', ['desc']).toString()) as List<dynamic>;
+  assert(rows.length == 2, 'expected 2 rows, got ${rows.length}');
+  assert((rows[0] as Map)['title'] == '海阔天空');
+  assert((rows[0] as Map)['sortValue'] == 2);
+  assert((rows[1] as Map)['title'] == '光辉岁月');
+  assert((rows[1] as Map)['sortValue'] == 1);
+  print('[stats] pageRows OK (带 sortValue): $rows');
 
   // ── 主题预设插件 ────────────────────────────────────────────────────────
   final presetSource = File('assets/plugins/theme_presets_plugin.dart').readAsStringSync();

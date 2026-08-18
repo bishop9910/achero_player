@@ -147,11 +147,18 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> seek(Duration position) => _engine.seek(position);
 
-  Future<void> setVolume(double volume) async {
+  /// 设置音量（0.0 ~ 1.0）。
+  ///
+  /// [persist] 为 false 时仅实时调整引擎、不落盘也不通知（用于拖动音量条
+  /// 期间的高频回调，避免每帧都写盘 + 重建页面）；拖动结束再以默认值提交。
+  Future<void> setVolume(double volume, {bool persist = true}) async {
     _volume = volume.clamp(0.0, 1.0);
     await _engine.setVolume(_volume);
-    _settings
-        .updatePlayback(_settings.settings.playback.copyWith(volume: _volume));
+    if (persist) {
+      _settings
+          .updatePlayback(_settings.settings.playback.copyWith(volume: _volume));
+      notifyListeners();
+    }
   }
 
   void toggleShuffle() {

@@ -7,7 +7,7 @@ String manifest(Function call) {
   return jsonEncode({
     'id': 'com.achero.statistics',
     'name': '播放统计',
-    'version': '1.3.0',
+    'version': '1.3.2',
     'description': '记录每首曲目的播放次数并展示排行榜',
     'icon': 'bar_chart',
     'page': {'id': 'com.achero.statistics.page', 'title': '播放统计', 'icon': 'bar_chart', 'sort': true},
@@ -47,21 +47,11 @@ String pageRows(Function call, String sortDir) {
         'title': t['title'],
         'subtitle': t['artist'] ?? '',
         'trailing': '$n 次',
-        '_count': n,
+        'sortValue': n,
       });
     }
   }
 
-  // sortDir: 'asc' = 正序（从少到多），'desc' = 倒序（从多到少，默认）
-  if (sortDir == 'asc') {
-    rows.sort((a, b) => a['_count'].compareTo(b['_count']));
-  } else {
-    rows.sort((a, b) => b['_count'].compareTo(a['_count']));
-  }
-
-  final out = [];
-  for (final r in rows) {
-    out.add({'title': r['title'], 'subtitle': r['subtitle'], 'trailing': r['trailing']});
-  }
-  return jsonEncode(out);
+  // 排序交给宿主按 sortValue 进行（dart_eval 的 List.sort 对闭包支持不稳）
+  return jsonEncode(rows);
 }

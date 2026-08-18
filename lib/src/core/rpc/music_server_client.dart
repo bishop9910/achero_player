@@ -185,7 +185,6 @@ class MusicServerClient {
     }
 
     final result = decoded['result'];
-    print('$method -> $result');
     return result is Map<String, dynamic> ? result : const {};
   }
 }

@@ -59,9 +59,18 @@ class _AppBuilder extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            WallpaperImage(path: theme.backgroundImagePath!, fs: fs),
-            ColoredBox(
-              color: Colors.black.withValues(alpha: theme.backgroundDim),
+            // RepaintBoundary：把「壁纸 + 蒙层」缓存为独立图层。路由过渡动画时
+            // 背景不再每帧重绘，避免上一页短暂停留的卡顿。
+            RepaintBoundary(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  WallpaperImage(path: theme.backgroundImagePath!, fs: fs),
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: theme.backgroundDim),
+                  ),
+                ],
+              ),
             ),
             child ?? const SizedBox.shrink(),
           ],

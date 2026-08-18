@@ -2,7 +2,7 @@ name: achero_player
 description: "Achero Player — 跨平台、可插拔、深度可定制的 Flutter 音乐播放器。支持 Windows / Linux / Android / Web。"
 publish_to: 'none'
 
-version: 1.0.2+2
+version: 1.0.3+1
 
 environment:
   sdk: ^3.12.2

@@ -289,6 +289,7 @@ class _ScriptRow {
     this.trailing,
     this.action,
     this.color,
+    this.sortValue,
   });
 
   final String title;
@@ -299,12 +300,16 @@ class _ScriptRow {
   /// 可选的 ARGB 颜色，用于在行左侧渲染一个色点。
   final int? color;
 
+  /// 可选的排序值：当页面声明了 `sort` 时，宿主据此排序。
+  final num? sortValue;
+
   factory _ScriptRow.fromJson(Map<String, dynamic> json) => _ScriptRow(
         title: json['title']?.toString() ?? '',
         subtitle: json['subtitle']?.toString(),
         trailing: json['trailing']?.toString(),
         action: json['action']?.toString(),
         color: (json['color'] as num?)?.toInt(),
+        sortValue: json['sortValue'] as num?,
       );
 }
 
@@ -329,9 +334,19 @@ class _ScriptPageState extends State<_ScriptPage> {
 
   void _reload() {
     final sortable = widget.adapter.pageSortable;
-    final rows = sortable
+    var rows = sortable
         ? widget.adapter._readRows('pageRows', [_sortDir])
         : widget.adapter._readRows('pageRows');
+    if (sortable) {
+      // 排序放在宿主（纯 Dart）进行，避免依赖 dart_eval 里不可靠的 List.sort。
+      rows = List.of(rows);
+      rows.sort((a, b) {
+        final av = a.sortValue ?? 0;
+        final bv = b.sortValue ?? 0;
+        return _sortDir == 'desc' ? bv.compareTo(av) : av.compareTo(bv);
+      });
+    }
+    debugPrint('[ScriptPage] 刷新 sortDir=$_sortDir 行数=${rows.length}');
     if (mounted) setState(() => _rows = rows);
   }
 
@@ -375,15 +390,16 @@ class _ScriptPageState extends State<_ScriptPage> {
                   child: Row(
                     children: [
                       const Spacer(),
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'desc', label: Text('倒序')),
-                          ButtonSegment(value: 'asc', label: Text('正序')),
-                        ],
-                        selected: {_sortDir},
-                        showSelectedIcon: false,
-                        onSelectionChanged: (selection) {
-                          _sortDir = selection.first;
+                      TextButton.icon(
+                        icon: Icon(
+                          _sortDir == 'desc'
+                              ? Icons.arrow_downward
+                              : Icons.arrow_upward,
+                          size: 18,
+                        ),
+                        label: Text(_sortDir == 'desc' ? '倒序' : '正序'),
+                        onPressed: () {
+                          _sortDir = _sortDir == 'desc' ? 'asc' : 'desc';
                           _reload();
                         },
                       ),
