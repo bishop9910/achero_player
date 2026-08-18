@@ -1,5 +1,5 @@
 #define MyAppName "Achero Player"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "bishop9910"
 #define MyAppExeName "achero_player.exe"
 
