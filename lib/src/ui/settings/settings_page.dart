@@ -89,7 +89,7 @@ class _NavTile extends StatelessWidget {
 class _AboutTile extends StatelessWidget {
   const _AboutTile();
 
-  /// 作者列表（后续有新开发者加入时追加到这里）。
+  /// 作者列表
   static const List<String> authors = ['bishop9910'];
   static const String version = "v1.0.4+0";
 
