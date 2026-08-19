@@ -94,14 +94,14 @@ class ThemeSettings {
       };
 
   static ThemeSettings fromJson(Map<String, dynamic> json) => ThemeSettings(
-        seedColor: (json['seedColor'] as num?)?.toInt() ?? 0xFF0984E3,
+        seedColor: _jsonNum(json['seedColor'])?.toInt() ?? 0xFF0984E3,
         brightness: ThemeBrightness.values.firstWhere(
           (b) => b.name == json['brightness'],
           orElse: () => ThemeBrightness.dark,
         ),
-        contrast: (json['contrast'] as num?)?.toDouble() ?? 0.0,
-        backgroundImagePath: json['backgroundImagePath'] as String?,
-        backgroundDim: (json['backgroundDim'] as num?)?.toDouble() ?? 0.55,
+        contrast: _jsonNum(json['contrast'])?.toDouble() ?? 0.0,
+        backgroundImagePath: _jsonString(json['backgroundImagePath']),
+        backgroundDim: _jsonNum(json['backgroundDim'])?.toDouble() ?? 0.55,
       );
 }
 
@@ -160,18 +160,17 @@ class FontSettings {
       };
 
   static FontSettings fromJson(Map<String, dynamic> json) => FontSettings(
-        uiFamily: json['uiFamily'] as String? ?? '',
-        lyricsFamily: json['lyricsFamily'] as String? ?? '',
-        uiFallback: (json['uiFallback'] as List<dynamic>?)?.cast<String>() ??
+        uiFamily: _jsonString(json['uiFamily']) ?? '',
+        lyricsFamily: _jsonString(json['lyricsFamily']) ?? '',
+        uiFallback: _jsonStringList(json['uiFallback']) ??
             const [
               'PingFang SC',
               'Microsoft YaHei',
               'Noto Sans CJK SC',
               'sans-serif',
             ],
-        lyricsScale: (json['lyricsScale'] as num?)?.toDouble() ?? 1.0,
-        fontFolders: (json['fontFolders'] as List<dynamic>?)?.cast<String>() ??
-            const [],
+        lyricsScale: _jsonNum(json['lyricsScale'])?.toDouble() ?? 1.0,
+        fontFolders: _jsonStringList(json['fontFolders']) ?? const [],
       );
 }
 
@@ -224,9 +223,9 @@ class LyricSettings {
           (a) => a.name == json['alignment'],
           orElse: () => LyricAlignment.center,
         ),
-        verticalOffset: (json['verticalOffset'] as num?)?.toDouble() ?? 0.0,
-        fontSize: (json['fontSize'] as num?)?.toDouble() ?? 20.0,
-        highlightColor: (json['highlightColor'] as num?)?.toInt(),
+        verticalOffset: _jsonNum(json['verticalOffset'])?.toDouble() ?? 0.0,
+        fontSize: _jsonNum(json['fontSize'])?.toDouble() ?? 20.0,
+        highlightColor: _jsonNum(json['highlightColor'])?.toInt(),
       );
 }
 
@@ -270,9 +269,9 @@ class PlaybackSettings {
           (r) => r.name == json['repeatMode'],
           orElse: () => RepeatMode.all,
         ),
-        shuffle: json['shuffle'] as bool? ?? false,
-        volume: (json['volume'] as num?)?.toDouble() ?? 1.0,
-        autoPlayNext: json['autoPlayNext'] as bool? ?? true,
+        shuffle: _jsonBool(json['shuffle']) ?? false,
+        volume: _jsonNum(json['volume'])?.toDouble() ?? 1.0,
+        autoPlayNext: _jsonBool(json['autoPlayNext']) ?? true,
       );
 }
 
@@ -290,7 +289,7 @@ class LibrarySettings {
   Map<String, dynamic> toJson() => {'folders': folders};
 
   static LibrarySettings fromJson(Map<String, dynamic> json) => LibrarySettings(
-        folders: (json['folders'] as List<dynamic>?)?.cast<String>() ?? const [],
+        folders: _jsonStringList(json['folders']) ?? const [],
       );
 }
 
@@ -337,15 +336,30 @@ class AppSettings {
       };
 
   static AppSettings fromJson(Map<String, dynamic> json) => AppSettings(
-        theme: ThemeSettings.fromJson(
-            (json['theme'] as Map<String, dynamic>?) ?? const {}),
-        font: FontSettings.fromJson(
-            (json['font'] as Map<String, dynamic>?) ?? const {}),
-        lyrics: LyricSettings.fromJson(
-            (json['lyrics'] as Map<String, dynamic>?) ?? const {}),
-        playback: PlaybackSettings.fromJson(
-            (json['playback'] as Map<String, dynamic>?) ?? const {}),
-        library: LibrarySettings.fromJson(
-            (json['library'] as Map<String, dynamic>?) ?? const {}),
+        theme: ThemeSettings.fromJson(_jsonMap(json['theme']) ?? const {}),
+        font: FontSettings.fromJson(_jsonMap(json['font']) ?? const {}),
+        lyrics: LyricSettings.fromJson(_jsonMap(json['lyrics']) ?? const {}),
+        playback:
+            PlaybackSettings.fromJson(_jsonMap(json['playback']) ?? const {}),
+        library:
+            LibrarySettings.fromJson(_jsonMap(json['library']) ?? const {}),
       );
 }
+
+// ---------------------------------------------------------------------------
+// 容错解析辅助：损坏 / 类型不符的 JSON 字段回退到默认值，而非抛异常。
+// ---------------------------------------------------------------------------
+
+num? _jsonNum(dynamic value) => value is num ? value : null;
+
+String? _jsonString(dynamic value) => value is String ? value : null;
+
+bool? _jsonBool(dynamic value) => value is bool ? value : null;
+
+/// 把 JSON 列表安全转为字符串列表；非字符串元素被丢弃，非列表返回 null。
+List<String>? _jsonStringList(dynamic value) => value is List
+    ? value.whereType<String>().toList(growable: false)
+    : null;
+
+Map<String, dynamic>? _jsonMap(dynamic value) =>
+    value is Map<String, dynamic> ? value : null;

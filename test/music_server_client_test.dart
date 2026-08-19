@@ -113,5 +113,79 @@ void main() {
       await client.ping();
       expect(authHeader, 'Bearer secret');
     });
+
+    test('listAlbums 解析专辑', () async {
+      final client = MusicServerClient(
+        endpoint: 'http://example.com/rpc',
+        client: MockClient((request) async {
+          final body = jsonDecode(utf8.decode(request.bodyBytes)) as Map<String, dynamic>;
+          expect(body['method'], 'music.listAlbums');
+          return _jsonResponse({
+            'jsonrpc': '2.0',
+            'id': body['id'],
+            'result': {
+              'albums': [
+                {'id': 'a1', 'name': '乐与怒', 'artist': 'Beyond', 'songCount': 10},
+              ],
+            },
+          });
+        }),
+      );
+
+      final albums = await client.listAlbums();
+      expect(albums.length, 1);
+      expect(albums.first.name, '乐与怒');
+      expect(albums.first.artist, 'Beyond');
+      expect(albums.first.songCount, 10);
+    });
+
+    test('listArtists 解析艺术家', () async {
+      final client = MusicServerClient(
+        endpoint: 'http://example.com/rpc',
+        client: MockClient((request) async {
+          final body = jsonDecode(utf8.decode(request.bodyBytes)) as Map<String, dynamic>;
+          expect(body['method'], 'music.listArtists');
+          return _jsonResponse({
+            'jsonrpc': '2.0',
+            'id': body['id'],
+            'result': {
+              'artists': [
+                {'id': 'ar1', 'name': 'Beyond', 'albumCount': 8, 'songCount': 96},
+              ],
+            },
+          });
+        }),
+      );
+
+      final artists = await client.listArtists();
+      expect(artists.length, 1);
+      expect(artists.first.name, 'Beyond');
+      expect(artists.first.albumCount, 8);
+    });
+
+    test('listSongs 按 albumId 拉取并解析曲目', () async {
+      final client = MusicServerClient(
+        endpoint: 'http://example.com/rpc',
+        client: MockClient((request) async {
+          final body = jsonDecode(utf8.decode(request.bodyBytes)) as Map<String, dynamic>;
+          expect(body['method'], 'music.listSongs');
+          expect(body['params']['albumId'], 'a1');
+          return _jsonResponse({
+            'jsonrpc': '2.0',
+            'id': body['id'],
+            'result': {
+              'tracks': [
+                {'id': '1', 'title': '海阔天空', 'artist': 'Beyond', 'album': '乐与怒'},
+              ],
+            },
+          });
+        }),
+      );
+
+      final tracks = await client.listSongs(albumId: 'a1');
+      expect(tracks.length, 1);
+      expect(tracks.first.title, '海阔天空');
+      expect(tracks.first.album, '乐与怒');
+    });
   });
 }

@@ -36,6 +36,9 @@ class TrackTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
+      // 手机屏幕窄，压缩标题与前后元素的间距，给歌名留出更多宽度。
+      horizontalTitleGap: 8,
+      minLeadingWidth: 28,
       leading: _Leading(
         track: track,
         index: index,

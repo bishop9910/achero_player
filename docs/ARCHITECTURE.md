@@ -7,7 +7,7 @@ Achero 追求**核心逻辑纯 Dart、依赖显式注入、可插拔**。除「�
 lib/src/
 ├── core/              纯 Dart 核心（不依赖 Flutter UI，可单测）
 │   ├── audio/         音频引擎抽象 + media_kit 实现
-│   ├── library/       音乐库、目录扫描、文件名元数据
+│   ├── library/       音乐库、目录扫描、元数据、专辑/艺术家分类（LibraryCatalog）
 │   ├── lyrics/        LRC 解析器与歌词模型
 │   ├── models/        Track（文件/字节/URL 三种来源）/ Playlist
 │   ├── platform/      平台文件系统（条件导入 IO/Web）+ 能力探测
@@ -38,6 +38,7 @@ bootstrap()
  ├─ SettingsController(settings)
  ├─ FontManager(fs)
  ├─ MusicLibrary(prefs, fs)
+ ├─ LibraryCatalog(library)            # 按专辑/艺术家建立分类索引
  ├─ MediaKitEngine()
  ├─ PlayerController(engine, settings, fs)
  ├─ PluginEventBus / PluginRegistry

@@ -91,6 +91,7 @@ class _AboutTile extends StatelessWidget {
 
   /// 作者列表（后续有新开发者加入时追加到这里）。
   static const List<String> authors = ['bishop9910'];
+  static const String version = "v1.0.3+9";
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +104,7 @@ class _AboutTile extends StatelessWidget {
           child: Icon(Icons.music_note),
         ),
         title: const Text('应用介绍'),
-        subtitle: const Text('v1.0.3+8 · 关于 · 作者 · 许可'),
+        subtitle: Text('$version · 关于 · 作者 · 许可'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _showAbout(context),
       ),
@@ -128,7 +129,7 @@ class _AboutTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('v1.0.3+8', style: Theme.of(context).textTheme.bodySmall),
+            Text(version, style: Theme.of(context).textTheme.bodySmall),
             Text('2026/8/19', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
             const Text('一个可深度自定义、支持插件的跨平台音乐播放器。'),

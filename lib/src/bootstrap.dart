@@ -8,6 +8,7 @@ import 'app_services.dart';
 import 'core/audio/audio_engine.dart';
 import 'core/audio/media_kit_engine.dart';
 import 'core/download/download_manager.dart';
+import 'core/library/library_catalog.dart';
 import 'core/library/music_library.dart';
 import 'core/models/track.dart';
 import 'core/platform/platform_fs_factory.dart';
@@ -33,6 +34,7 @@ Future<AppServices> bootstrap() async {
   final settings = SettingsController(prefs, AppSettings.defaults);
   final fonts = FontManager(fs);
   final library = MusicLibrary(prefs: prefs, fs: fs);
+  final catalog = LibraryCatalog(library);
   final downloads = DownloadManager(library: library);
   final engine = MediaKitEngine();
   final player = PlayerController(
@@ -50,6 +52,7 @@ Future<AppServices> bootstrap() async {
     fonts: fonts,
     fs: fs,
     library: library,
+    catalog: catalog,
     engine: engine,
     player: player,
     events: events,

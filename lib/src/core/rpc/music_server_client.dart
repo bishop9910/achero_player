@@ -53,6 +53,76 @@ class RemoteTrack {
       };
 }
 
+/// RPC 音乐服务器返回的专辑元数据。
+class RemoteAlbum {
+  const RemoteAlbum({
+    required this.id,
+    required this.name,
+    this.artist,
+    this.coverUrl,
+    this.songCount,
+    this.year,
+  });
+
+  final String id;
+  final String name;
+  final String? artist;
+  final String? coverUrl;
+  final int? songCount;
+  final int? year;
+
+  static RemoteAlbum fromJson(Map<String, dynamic> json) => RemoteAlbum(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        artist: json['artist'] as String?,
+        coverUrl: json['coverUrl'] as String?,
+        songCount: (json['songCount'] as num?)?.toInt(),
+        year: (json['year'] as num?)?.toInt(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'artist': artist,
+        'coverUrl': coverUrl,
+        'songCount': songCount,
+        'year': year,
+      };
+}
+
+/// RPC 音乐服务器返回的艺术家元数据。
+class RemoteArtist {
+  const RemoteArtist({
+    required this.id,
+    required this.name,
+    this.albumCount,
+    this.songCount,
+    this.coverUrl,
+  });
+
+  final String id;
+  final String name;
+  final int? albumCount;
+  final int? songCount;
+  final String? coverUrl;
+
+  static RemoteArtist fromJson(Map<String, dynamic> json) => RemoteArtist(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        albumCount: (json['albumCount'] as num?)?.toInt(),
+        songCount: (json['songCount'] as num?)?.toInt(),
+        coverUrl: json['coverUrl'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'albumCount': albumCount,
+        'songCount': songCount,
+        'coverUrl': coverUrl,
+      };
+}
+
 /// RPC 调用失败（网络错误、非 200、或 JSON-RPC 错误对象）。
 class MusicServerException implements Exception {
   const MusicServerException(this.message, {this.code});
@@ -101,12 +171,7 @@ class MusicServerClient {
       'offset': offset,
       'limit': limit,
     });
-    final list = result['tracks'];
-    if (list is! List) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(RemoteTrack.fromJson)
-        .toList(growable: false);
+    return _parseItems(result['tracks'], RemoteTrack.fromJson);
   }
 
   /// 解析流地址：`music.streamUrl`，返回可直接播放的 URL。
@@ -119,8 +184,59 @@ class MusicServerClient {
     return url;
   }
 
+  /// 拉取专辑列表：`music.listAlbums`。
+  Future<List<RemoteAlbum>> listAlbums({int offset = 0, int limit = 200}) async {
+    final result = await _call('music.listAlbums', {
+      'offset': offset,
+      'limit': limit,
+    });
+    return _parseItems(result['albums'], RemoteAlbum.fromJson);
+  }
+
+  /// 拉取艺术家列表：`music.listArtists`。
+  Future<List<RemoteArtist>> listArtists({
+    int offset = 0,
+    int limit = 200,
+  }) async {
+    final result = await _call('music.listArtists', {
+      'offset': offset,
+      'limit': limit,
+    });
+    return _parseItems(result['artists'], RemoteArtist.fromJson);
+  }
+
+  /// 按专辑或艺术家拉取曲目：`music.listSongs`。
+  ///
+  /// [albumId] 与 [artistId] 至少提供其一；同时提供时以服务器实现为准。
+  Future<List<RemoteTrack>> listSongs({
+    String? albumId,
+    String? artistId,
+    int offset = 0,
+    int limit = 200,
+  }) async {
+    final result = await _call('music.listSongs', {
+      if (albumId != null && albumId.isNotEmpty) 'albumId': albumId,
+      if (artistId != null && artistId.isNotEmpty) 'artistId': artistId,
+      'offset': offset,
+      'limit': limit,
+    });
+    return _parseItems(result['tracks'], RemoteTrack.fromJson);
+  }
+
   void close() {
     if (_ownsClient) _client.close();
+  }
+
+  /// 归一化服务器返回的列表节点（缺失或非数组时返回空列表）。
+  static List<T> _parseItems<T>(
+    dynamic node,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
+    if (node is! List) return const [];
+    return node
+        .whereType<Map<String, dynamic>>()
+        .map(fromJson)
+        .toList(growable: false);
   }
 
   // ---------------------------------------------------------------------------

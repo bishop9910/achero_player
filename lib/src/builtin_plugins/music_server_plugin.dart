@@ -17,6 +17,9 @@ import '../ui/settings/cache_settings_section.dart';
 /// 使用 [MusicServerClient]（JSON-RPC 2.0 over HTTP）拉取远端曲目：
 /// * 列表元数据**不缓存**——每次连接都请求服务器最新数据；
 /// * 音频流下载到缓存后以 [FileTrackSource] 播放（Web 退化为在线流式）。
+///
+/// 本插件页只负责「连接到服务器 → 导入曲库」；曲目导入后统一进入曲库，
+/// 专辑 / 艺术家分类由核心 [LibraryCatalog] 在主页「曲库」中统一管理。
 /// 协议细节见 `docs/RPC.md`。
 class MusicServerPlugin extends AcheroPlugin {
   @override

@@ -29,11 +29,12 @@ class _MarqueeTextState extends State<MarqueeText>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 与实际渲染的 Text 用同一套样式（合并 DefaultTextStyle）测量，
+        // 并采用系统字体缩放，保证滚动距离和真实渲染宽度一致。
+        final style = DefaultTextStyle.of(context).style.merge(widget.style);
         final painter = TextPainter(
-          text: TextSpan(text: widget.text, style: widget.style),
+          text: TextSpan(text: widget.text, style: style),
           maxLines: 1,
-          // 用实际环境的方向与字体缩放来测量，保证与下方 Text 的渲染宽度一致；
-          // 否则在手机端系统字体放大时，marquee 的滚动距离算小，末尾字符被截断。
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
         )..layout();
@@ -56,19 +57,25 @@ class _MarqueeTextState extends State<MarqueeText>
 
         final maxOffset = painter.width - constraints.maxWidth;
         return ClipRect(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return Transform.translate(
-                offset: Offset(-maxOffset * _controller.value, 0),
-                child: Text(
-                  widget.text,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: widget.style,
-                ),
-              );
-            },
+          // 关键：让 Text 按完整内容宽度排版。若不加 OverflowBox，Text 会被
+          // 父级 maxWidth 约束直接裁掉，滚动的就只是被截断的片段。
+          child: OverflowBox(
+            alignment: Alignment.centerLeft,
+            maxWidth: double.infinity,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                return Transform.translate(
+                  offset: Offset(-maxOffset * _controller.value, 0),
+                  child: Text(
+                    widget.text,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: widget.style,
+                  ),
+                );
+              },
+            ),
           ),
         );
       },
