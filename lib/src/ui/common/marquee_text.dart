@@ -59,22 +59,32 @@ class _MarqueeTextState extends State<MarqueeText>
         return ClipRect(
           // 关键：让 Text 按完整内容宽度排版。若不加 OverflowBox，Text 会被
           // 父级 maxWidth 约束直接裁掉，滚动的就只是被截断的片段。
-          child: OverflowBox(
-            alignment: Alignment.centerLeft,
-            maxWidth: double.infinity,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                return Transform.translate(
-                  offset: Offset(-maxOffset * _controller.value, 0),
-                  child: Text(
-                    widget.text,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: widget.style,
-                  ),
-                );
-              },
+          //
+          // OverflowBox 的 fit 默认为 max，会把自己撑到 `constraints.biggest`：
+          // 在高度无界的容器（如竖向列表的 ListTile subtitle）里，那会让它的
+          // 高度变成无穷大，触发 "RenderFlex ... infinite size"，并级联出
+          // NaN / Matrix4 等报错；在高度有界但宽松的容器里，则会把这一行撑到
+          // 可用高度的最大值，把下面的进度条挤乱。这里用 SizedBox 把高度固定
+          // 为单行文本高度，只允许横向溢出，纵向保持与普通单行文本一致。
+          child: SizedBox(
+            height: painter.height,
+            child: OverflowBox(
+              alignment: Alignment.centerLeft,
+              maxWidth: double.infinity,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return Transform.translate(
+                    offset: Offset(-maxOffset * _controller.value, 0),
+                    child: Text(
+                      widget.text,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: widget.style,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         );
