@@ -7,6 +7,8 @@ import '../../core/plugins/plugin_registry.dart';
 import '../../core/plugins/plugin_types.dart';
 import '../../core/settings/app_settings.dart';
 import '../common/cover_art.dart';
+import '../common/marquee_text.dart';
+import '../common/source_badge.dart';
 import 'lyrics_view.dart';
 import 'seek_bar.dart';
 
@@ -39,6 +41,7 @@ class _PlayerPageState extends State<PlayerPage> {
           _Header(
             trackTitle: track.title,
             subtitle: track.subtitle,
+            origin: track.origin,
             lyricsMode: _lyricsMode,
             onToggle: () => setState(() => _lyricsMode = !_lyricsMode),
           ),
@@ -67,12 +70,14 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.trackTitle,
     required this.subtitle,
+    required this.origin,
     required this.lyricsMode,
     required this.onToggle,
   });
 
   final String trackTitle;
   final String subtitle;
+  final TrackOrigin origin;
   final bool lyricsMode;
   final VoidCallback onToggle;
 
@@ -85,20 +90,26 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                trackTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      trackTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SourceBadge(origin: origin),
+                ],
               ),
               if (subtitle.isNotEmpty)
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                MarqueeText(
+                  text: subtitle,
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
@@ -192,9 +203,16 @@ class _Controls extends StatelessWidget {
         const SizedBox(width: 8),
         IconButton(
           tooltip: player.repeatMode.label,
-          icon: Icon(player.repeatMode.icon,
-              color: player.repeatMode == RepeatMode.off ? scheme.onSurfaceVariant : scheme.primary),
           onPressed: player.cycleRepeatMode,
+          icon: Icon(player.repeatMode.icon),
+          color: player.repeatMode == RepeatMode.off
+              ? scheme.onSurfaceVariant
+              : scheme.primary,
+          style: player.repeatMode == RepeatMode.off
+              ? null
+              : IconButton.styleFrom(
+                  backgroundColor: scheme.primary.withValues(alpha: 0.14),
+                ),
         ),
       ],
     );

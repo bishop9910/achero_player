@@ -30,9 +30,8 @@ class _SeekBarState extends State<SeekBar> {
     final totalMs = widget.duration.inMilliseconds;
     final value = totalMs <= 0
         ? 0.0
-        : ((_dragValue ??
-                    widget.position.inMilliseconds.toDouble()) /
-                totalMs)
+        : (_dragValue ??
+                widget.position.inMilliseconds.toDouble() / totalMs)
             .clamp(0.0, 1.0);
 
     final shown = _dragValue == null

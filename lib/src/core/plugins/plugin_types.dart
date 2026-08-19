@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../download/download_manager.dart';
 import '../library/music_library.dart';
 import '../platform/platform_filesystem.dart';
 import '../player/player_controller.dart';
@@ -121,6 +122,7 @@ class PluginContext {
     required this.fonts,
     required this.fs,
     required this.events,
+    required this.downloads,
     required this.prefs,
     required this.log,
   });
@@ -132,6 +134,9 @@ class PluginContext {
   final FontManager fonts;
   final PlatformFileSystem fs;
   final PluginEventBus events;
+
+  /// 下载管理器（插件用于注册自己的缓存目录）。
+  final DownloadManager downloads;
 
   /// 该插件专属的持久化键值存储（自动按插件 id 命名空间隔离）。
   final PluginPrefs prefs;

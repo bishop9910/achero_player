@@ -89,59 +89,83 @@ class _NavTile extends StatelessWidget {
 class _AboutTile extends StatelessWidget {
   const _AboutTile();
 
-  /// 作者名（要改就在这里改）。
-  static const String authorName = 'Bishop9910';
+  /// 作者列表（后续有新开发者加入时追加到这里）。
+  static const List<String> authors = ['bishop9910'];
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => showAboutDialog(
-          context: context,
-          applicationName: 'Achero Player',
-          applicationVersion: '1.0.3',
-          applicationIcon: const CircleAvatar(
-            radius: 24,
-            foregroundImage: AssetImage('assets/images/bishop9910.png'),
-            child: Icon(Icons.music_note),
-          ),
-          applicationLegalese: '一个可深度自定义、支持插件的跨平台音乐播放器。',
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        leading: const CircleAvatar(
+          foregroundImage: AssetImage('assets/images/logo.jpg'),
+          child: Icon(Icons.music_note),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                foregroundImage:
-                    const AssetImage('assets/images/bishop9910.jpg'),
-                child: const Icon(Icons.person),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        title: const Text('应用介绍'),
+        subtitle: const Text('v1.0.3+8 · 关于 · 作者 · 许可'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _showAbout(context),
+      ),
+    );
+  }
+
+  void _showAbout(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const CircleAvatar(
+              foregroundImage: AssetImage('assets/images/logo.jpg'),
+              child: Icon(Icons.music_note),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Achero Player')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('v1.0.3+8', style: Theme.of(context).textTheme.bodySmall),
+            Text('2026/8/19', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            const Text('一个可深度自定义、支持插件的跨平台音乐播放器。'),
+            const SizedBox(height: 16),
+            Text('作者', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 6),
+            for (final author in authors)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
                   children: [
-                    Text('作者',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(color: scheme.primary)),
-                    const SizedBox(height: 2),
-                    Text(authorName,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 2),
-                    Text('v1.0.3 跨平台 · 可插拔',
-                        style: Theme.of(context).textTheme.bodySmall),
+                    CircleAvatar(
+                      foregroundImage: AssetImage('assets/images/$author.jpg'),
+                      child: const Icon(Icons.music_note),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(author),
                   ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => showLicensePage(
+              context: context,
+              applicationName: 'Achero Player',
+              applicationVersion: '1.0.3',
+              applicationIcon: const Icon(Icons.music_note),
+            ),
+            child: const Text('查看许可'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
       ),
     );
   }

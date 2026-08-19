@@ -9,7 +9,6 @@ import 'package:path_provider/path_provider.dart';
 import '../core/cache/cache_manager.dart';
 import '../core/models/track.dart';
 import '../core/plugins/plugin_types.dart';
-import '../core/rpc/download.dart';
 import '../core/rpc/subsonic_client.dart';
 import '../core/util/stable_id.dart';
 import '../ui/settings/cache_settings_section.dart';
@@ -27,7 +26,7 @@ class SubsonicPlugin extends AcheroPlugin {
   String get name => 'Subsonic 服务器';
 
   @override
-  String get version => '1.2.2';
+  String get version => '1.3.0';
 
   @override
   String get description => '连接 Navidrome / Airsonic 等服务器，导入并缓存音乐。';
@@ -83,6 +82,7 @@ class SubsonicPlugin extends AcheroPlugin {
     );
     await cache.init();
     _cache = cache;
+    _context?.downloads.registerCache(TrackOrigin.subsonic, cache);
   }
 
   Future<String> _defaultCacheDir() async {
@@ -626,27 +626,28 @@ Future<SubsonicSearchResults> _cachedSearch(
   return results;
 }
 
-/// 把歌曲转为可播放的 [Track]：优先写入缓存并播放本地文件，
-/// 无缓存能力（Web）时退化为 URL 在线流式。
+/// 把歌曲转为可播放的 [Track]：**不下载音频**，命中缓存用本地文件，
+/// 否则在线流式（保证「导入」很快）。封面复用已缓存项。
 Future<Track?> _buildTrack(
   SubsonicSong song,
   SubsonicClient client,
   CacheManager? cache,
 ) async {
   final ext = _audioExtension(song);
-  if (cache != null) {
-    if (await cache.hasAudio(song.id, ext)) {
-      return _makeTrack(song, client, FileTrackSource(cache.audioPath(song.id, ext)));
-    }
-    final bytes = await downloadStream(client.streamUri(song.id));
-    if (bytes == null) return null;
-    final path = await cache.putAudio(song.id, ext, bytes);
-    return _makeTrack(song, client, FileTrackSource(path));
+  final url = client.streamUri(song.id).toString();
+  final coverPath = (cache != null && await cache.hasCover(song.id))
+      ? cache.coverPath(song.id)
+      : null;
+  if (cache != null && await cache.hasAudio(song.id, ext)) {
+    return _makeTrack(song, client, FileTrackSource(cache.audioPath(song.id, ext)),
+        coverPath: coverPath, remoteUrl: url);
   }
-  return _makeTrack(song, client, UrlTrackSource(client.streamUri(song.id).toString()));
+  return _makeTrack(song, client, UrlTrackSource(url),
+      coverPath: coverPath, remoteUrl: url);
 }
 
-Track _makeTrack(SubsonicSong song, SubsonicClient client, TrackSource source) {
+Track _makeTrack(SubsonicSong song, SubsonicClient client, TrackSource source,
+    {String? coverPath, required String remoteUrl}) {
   return Track(
     id: stableId('subsonic:${client.baseUrl}#${song.id}', prefix: 'track'),
     title: song.title,
@@ -654,9 +655,12 @@ Track _makeTrack(SubsonicSong song, SubsonicClient client, TrackSource source) {
     album: song.album,
     duration: Duration(seconds: song.durationSec ?? 0),
     source: source,
+    coverArtPath: coverPath,
     coverArtUrl: song.coverArt == null
         ? null
         : client.coverArtUri(song.coverArt!).toString(),
+    origin: TrackOrigin.subsonic,
+    remoteUrl: remoteUrl,
   );
 }
 

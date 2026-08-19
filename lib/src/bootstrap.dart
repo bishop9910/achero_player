@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_services.dart';
 import 'core/audio/audio_engine.dart';
 import 'core/audio/media_kit_engine.dart';
+import 'core/download/download_manager.dart';
 import 'core/library/music_library.dart';
 import 'core/models/track.dart';
 import 'core/platform/platform_fs_factory.dart';
@@ -32,11 +33,13 @@ Future<AppServices> bootstrap() async {
   final settings = SettingsController(prefs, AppSettings.defaults);
   final fonts = FontManager(fs);
   final library = MusicLibrary(prefs: prefs, fs: fs);
+  final downloads = DownloadManager(library: library);
   final engine = MediaKitEngine();
   final player = PlayerController(
     engine: engine,
     settings: settings,
     fs: fs,
+    library: library,
   );
   final events = PluginEventBus();
   final plugins = PluginRegistry(prefs);
@@ -51,6 +54,7 @@ Future<AppServices> bootstrap() async {
     player: player,
     events: events,
     plugins: plugins,
+    downloads: downloads,
   );
 
   // 运行时字体：默认数据目录 + 用户配置目录。
@@ -80,6 +84,7 @@ PluginContext _contextFor(AcheroPlugin plugin, AppServices services) {
     fonts: services.fonts,
     fs: services.fs,
     events: services.events,
+    downloads: services.downloads,
     prefs: PluginPrefs(services.prefs, plugin.id),
     log: (message) => debugPrint('[${plugin.id}] $message'),
   );

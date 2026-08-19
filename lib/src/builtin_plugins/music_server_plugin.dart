@@ -8,7 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import '../core/cache/cache_manager.dart';
 import '../core/models/track.dart';
 import '../core/plugins/plugin_types.dart';
-import '../core/rpc/download.dart';
 import '../core/rpc/music_server_client.dart';
 import '../core/util/stable_id.dart';
 import '../ui/settings/cache_settings_section.dart';
@@ -27,7 +26,7 @@ class MusicServerPlugin extends AcheroPlugin {
   String get name => '音乐服务器';
 
   @override
-  String get version => '1.2.4';
+  String get version => '1.3.0';
 
   @override
   String get description => '通过 RPC 音乐服务器添加并缓存流式播放曲目。';
@@ -81,6 +80,7 @@ class MusicServerPlugin extends AcheroPlugin {
     );
     await cache.init();
     _cache = cache;
+    _context?.downloads.registerCache(TrackOrigin.rpc, cache);
   }
 
   Future<String> _defaultCacheDir() async {
@@ -253,7 +253,7 @@ class _ServerPageState extends State<_ServerPage> {
           const SizedBox(height: 4),
           for (final track in _tracks)
             ListTile(
-              leading: const Icon(Icons.cloud_download_outlined),
+              leading: const Icon(Icons.music_note_outlined),
               title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text([track.artist, track.album].whereType<String>().join(' · ')),
               trailing: IconButton(
@@ -348,13 +348,14 @@ class _ServerPageState extends State<_ServerPage> {
     setState(() => _loading = true);
     final built = <Track>[];
     var failures = 0;
-    for (final remote in _tracks) {
+    // 并行构建，避免逐首串行等待（尤其是封面下载）。
+    await Future.wait(_tracks.map((remote) async {
       try {
         built.add(await _buildTrack(remote, client));
       } catch (_) {
         failures++;
       }
-    }
+    }));
     final added = library.addTracks(built);
     if (!mounted) return;
     setState(() => _loading = false);
@@ -364,8 +365,8 @@ class _ServerPageState extends State<_ServerPage> {
     ));
   }
 
-  /// 解析流地址并缓存音频：命中缓存 → 本地文件；否则下载后播放；
-  /// 无缓存能力（Web）→ 在线流式。
+  /// 构建可添加到曲库的 [Track]：**不下载音频**，命中缓存用本地文件，
+  /// 否则在线流式（保证「添加」很快）。封面做尽力而为的本地缓存。
   Future<Track> _buildTrack(RemoteTrack remote, MusicServerClient client) async {
     final url = remote.url ?? await client.resolveStreamUrl(remote.id);
     final ext = _extensionFromUrl(url);
@@ -374,26 +375,29 @@ class _ServerPageState extends State<_ServerPage> {
     };
 
     final cache = widget.plugin._cache;
-    if (cache != null) {
-      if (await cache.hasAudio(remote.id, ext)) {
-        return _makeTrack(
-            remote, client, FileTrackSource(cache.audioPath(remote.id, ext)), metadata);
-      }
-      final bytes = await downloadStream(Uri.parse(url));
-      if (bytes != null) {
-        final path = await cache.putAudio(remote.id, ext, bytes);
-        return _makeTrack(remote, client, FileTrackSource(path), metadata);
-      }
+    final TrackSource source;
+    if (cache != null && await cache.hasAudio(remote.id, ext)) {
+      source = FileTrackSource(cache.audioPath(remote.id, ext));
+    } else {
+      source = UrlTrackSource(url);
     }
-    return _makeTrack(remote, client, UrlTrackSource(url), metadata);
+
+    // 封面只在「下载」时缓存；添加时若已缓存则复用，否则走网络地址，保证添加最快。
+    final coverPath = (cache != null && await cache.hasCover(remote.id))
+        ? cache.coverPath(remote.id)
+        : null;
+    return _makeTrack(remote, client, source, metadata,
+        coverPath: coverPath, remoteUrl: url);
   }
 
   Track _makeTrack(
     RemoteTrack remote,
     MusicServerClient client,
     TrackSource source,
-    Map<String, dynamic> metadata,
-  ) {
+    Map<String, dynamic> metadata, {
+    String? coverPath,
+    required String remoteUrl,
+  }) {
     return Track(
       id: stableId('${client.endpoint}#${remote.id}', prefix: 'track'),
       title: remote.title,
@@ -401,8 +405,11 @@ class _ServerPageState extends State<_ServerPage> {
       album: remote.album,
       duration: Duration(milliseconds: remote.durationMs ?? 0),
       source: source,
+      coverArtPath: coverPath,
       coverArtUrl: remote.coverUrl,
       metadata: metadata,
+      origin: TrackOrigin.rpc,
+      remoteUrl: remoteUrl,
     );
   }
 

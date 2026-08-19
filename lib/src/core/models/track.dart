@@ -89,6 +89,18 @@ class UrlTrackSource extends TrackSource {
   int get hashCode => url.hashCode;
 }
 
+/// 音源类型（音乐来源），用于在播放页标识当前曲目来自哪里。
+enum TrackOrigin {
+  local('本地'),
+  rpc('RPC'),
+  subsonic('Subsonic');
+
+  const TrackOrigin(this.label);
+
+  /// 展示用名称。
+  final String label;
+}
+
 /// 一首可播放的曲目。
 ///
 /// 元数据（标题 / 艺术家 / 专辑）默认由 [LibraryScanner] 从文件名与目录结构推断，
@@ -107,6 +119,8 @@ class Track {
     this.coverArtUrl,
     this.lyricsPath,
     this.metadata = const {},
+    this.origin = TrackOrigin.local,
+    this.remoteUrl,
   });
 
   /// 稳定的唯一标识。文件来源通常基于路径哈希，保证跨会话一致。
@@ -117,6 +131,14 @@ class Track {
   final int? trackNumber;
   final Duration duration;
   final TrackSource source;
+
+  /// 音源类型（本地 / RPC / Subsonic）。
+  final TrackOrigin origin;
+
+  /// 服务器流地址（RPC / Subsonic 源；本地曲目为 null）。
+  ///
+  /// 下载后仍保留：本地文件缺失/损坏时回退到该地址在线播放，或重新下载。
+  final String? remoteUrl;
 
   /// 封面图本地路径（可空）。
   final String? coverArtPath;
@@ -163,6 +185,8 @@ class Track {
     String? coverArtUrl,
     String? lyricsPath,
     Map<String, dynamic>? metadata,
+    TrackOrigin? origin,
+    String? remoteUrl,
     bool clearArtist = false,
     bool clearAlbum = false,
   }) {
@@ -178,6 +202,8 @@ class Track {
       coverArtUrl: coverArtUrl ?? this.coverArtUrl,
       lyricsPath: lyricsPath ?? this.lyricsPath,
       metadata: metadata ?? this.metadata,
+      origin: origin ?? this.origin,
+      remoteUrl: remoteUrl ?? this.remoteUrl,
     );
   }
 
@@ -193,6 +219,8 @@ class Track {
         'coverArtUrl': coverArtUrl,
         'lyricsPath': lyricsPath,
         'metadata': metadata,
+        'origin': origin.name,
+        'remoteUrl': remoteUrl,
       };
 
   static Track fromJson(Map<String, dynamic> json) => Track(
@@ -207,6 +235,8 @@ class Track {
         coverArtUrl: json['coverArtUrl'] as String?,
         lyricsPath: json['lyricsPath'] as String?,
         metadata: (json['metadata'] as Map<String, dynamic>?) ?? const {},
+        origin: _originFromName(json['origin'] as String?),
+        remoteUrl: json['remoteUrl'] as String?,
       );
 
   static Map<String, dynamic> _sourceToJson(TrackSource source) =>
@@ -234,6 +264,9 @@ class Track {
       _ => throw ArgumentError('无法解析的曲目来源: ${json['type']}'),
     };
   }
+
+  static TrackOrigin _originFromName(String? name) =>
+      TrackOrigin.values.asNameMap()[name] ?? TrackOrigin.local;
 
   @override
   bool operator ==(Object other) => other is Track && other.id == id;

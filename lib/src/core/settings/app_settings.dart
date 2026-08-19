@@ -234,7 +234,7 @@ class LyricSettings {
 @immutable
 class PlaybackSettings {
   const PlaybackSettings({
-    this.repeatMode = RepeatMode.off,
+    this.repeatMode = RepeatMode.all,
     this.shuffle = false,
     this.volume = 1.0,
     this.autoPlayNext = true,
@@ -268,7 +268,7 @@ class PlaybackSettings {
   static PlaybackSettings fromJson(Map<String, dynamic> json) => PlaybackSettings(
         repeatMode: RepeatMode.values.firstWhere(
           (r) => r.name == json['repeatMode'],
-          orElse: () => RepeatMode.off,
+          orElse: () => RepeatMode.all,
         ),
         shuffle: json['shuffle'] as bool? ?? false,
         volume: (json['volume'] as num?)?.toDouble() ?? 1.0,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'app_services.dart';
+import 'core/download/download_manager.dart';
 import 'core/library/music_library.dart';
 import 'core/player/player_controller.dart';
 import 'core/plugins/plugin_registry.dart';
@@ -27,6 +28,7 @@ class AcheroApp extends StatelessWidget {
         ChangeNotifierProvider<PlayerController>.value(value: services.player),
         ChangeNotifierProvider<PluginRegistry>.value(value: services.plugins),
         ChangeNotifierProvider<FontManager>.value(value: services.fonts),
+        ChangeNotifierProvider<DownloadManager>.value(value: services.downloads),
       ],
       child: const _AppBuilder(),
     );

@@ -3,7 +3,6 @@ import 'builtin_plugins/desktop_lyrics_plugin.dart';
 import 'builtin_plugins/music_server_plugin.dart';
 import 'builtin_plugins/subsonic_plugin.dart';
 import 'builtin_plugins/tags_plugin.dart';
-import 'builtin_plugins/visualizer_plugin.dart';
 import 'core/plugins/plugin_registry.dart';
 
 /// 插件注册入口（编译进应用的部分）。
@@ -18,7 +17,6 @@ import 'core/plugins/plugin_registry.dart';
 /// 在下方 `registry.register(你的插件())`。完整指南见 `docs/PLUGINS.md`。
 void registerAllPlugins(PluginRegistry registry) {
   registry
-    ..register(VisualizerPlugin())
     ..register(MusicServerPlugin())
     ..register(SubsonicPlugin())
     ..register(TagsPlugin())

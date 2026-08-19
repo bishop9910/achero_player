@@ -114,6 +114,15 @@ class MusicLibrary extends ChangeNotifier {
   /// 以 [Track.id] 去重；已存在的曲目保留原时长等运行期信息。
   int addTracks(Iterable<Track> tracks) => _merge(tracks.toList(growable: false));
 
+  /// 用 [track] 替换同 id 的曲目（不存在则新增）并持久化。
+  ///
+  /// 供下载缓存后把曲目来源从 [UrlTrackSource] 换成 [FileTrackSource]。
+  void upsertTrack(Track track) {
+    _byId[track.id] = track;
+    _persist();
+    notifyListeners();
+  }
+
   int _merge(List<Track> incoming) {
     var added = 0;
     for (final track in incoming) {

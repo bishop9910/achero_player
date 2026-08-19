@@ -110,6 +110,11 @@ class LrcParser {
       }
       text = text.trim();
 
+      // 过滤「只有时间戳、没有正文」的空行（如 `[00:28.30]` 后直接换行）。
+      // 这类行没有任何可显示内容，保留会让桌面歌词在对应时间点把空字符串
+      // 误判成「暂无歌词」。
+      if (text.isEmpty) continue;
+
       final words = _parseWords(text, offset);
 
       for (final t in timestamps) {

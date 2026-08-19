@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../app_services.dart';
 import '../../core/library/music_library.dart';
 import '../../core/models/track.dart';
 import '../../core/player/player_controller.dart';
 import '../common/cover_art.dart';
+import '../common/marquee_text.dart';
 
 /// 曲目列表项：点击播放，右键菜单提供播放列表 / 收藏 / 移除操作。
 class TrackTile extends StatelessWidget {
@@ -30,6 +32,7 @@ class TrackTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final player = context.read<PlayerController>();
     final library = context.read<MusicLibrary>();
+    final downloads = context.read<AppServices>().downloads;
 
     return ListTile(
       onTap: onTap,
@@ -51,7 +54,10 @@ class TrackTile extends StatelessWidget {
       ),
       subtitle: track.subtitle.isEmpty
           ? null
-          : Text(track.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          : MarqueeText(
+              text: track.subtitle,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
       trailing: PopupMenuButton<_TrackAction>(
         tooltip: '更多操作',
         icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
@@ -66,6 +72,15 @@ class TrackTile extends StatelessWidget {
             case _TrackAction.addToPlaylist:
               await _showPlaylistPicker(context, track);
               break;
+            case _TrackAction.download:
+              final ok = await downloads.download(track);
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('无法下载：缺少缓存或服务器地址'),
+                  duration: Duration(milliseconds: 1500),
+                ));
+              }
+              break;
             case _TrackAction.remove:
               onRemove?.call();
               break;
@@ -79,6 +94,11 @@ class TrackTile extends StatelessWidget {
           ),
           const PopupMenuItem(
               value: _TrackAction.addToPlaylist, child: Text('添加到播放列表')),
+          if (track.origin != TrackOrigin.local)
+            PopupMenuItem(
+              value: _TrackAction.download,
+              child: Text(track.source is FileTrackSource ? '重新下载' : '下载'),
+            ),
           if (onRemove != null)
             const PopupMenuItem(value: _TrackAction.remove, child: Text('从曲库移除')),
         ],
@@ -143,7 +163,8 @@ class _Leading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 有封面：显示圆形缩略图，当前播放时加主色描边。
-    final hasCover = track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty;
+    final hasCover = (track.coverArtUrl != null && track.coverArtUrl!.isNotEmpty) ||
+        (track.coverArtPath != null && track.coverArtPath!.isNotEmpty);
     if (hasCover) {
       return Container(
         width: 40,
@@ -180,4 +201,4 @@ class _Leading extends StatelessWidget {
   }
 }
 
-enum _TrackAction { play, favorite, addToPlaylist, remove }
+enum _TrackAction { play, favorite, addToPlaylist, download, remove }

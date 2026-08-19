@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:media_kit/media_kit.dart' hide Track;
 
 import '../models/track.dart';
@@ -15,12 +17,31 @@ import 'audio_engine.dart';
 class MediaKitEngine implements AudioEngine {
   MediaKitEngine() {
     _player = Player();
+    unawaited(_disableExternalFileAutoload());
   }
 
   late final Player _player;
 
   /// 待播放的媒体（[load] 时生成，[play] 时打开）。
   Media? _prepared;
+
+  /// libmpv 默认会按「同名」自动挂载外挂字幕/音频（ffmpeg 自带 LRC 解析器，
+  /// 于是同名的 .lrc 会被当成字幕去加载）。本应用自行解析歌词，无需 libmpv
+  /// 加载；否则打开含中文路径的音频时，libmpv 用 `/` 路径加载 .lrc 失败，
+  /// 报出非致命错误 "Can not open external file ..." 干扰播放错误判断。
+  Future<void> _disableExternalFileAutoload() async {
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      try {
+        // Web 端是 WebPlayer，且其 stub NativePlayer 没有 setProperty；
+        // 用 dynamic 规避静态类型差异，仅在原生端生效。
+        await (platform as dynamic).setProperty('sub-auto', 'no');
+        await (platform as dynamic).setProperty('audio-file-auto', 'no');
+      } catch (_) {
+        // 关闭失败不影响播放。
+      }
+    }
+  }
 
   @override
   Stream<PlaybackStatus> get statusStream => _player.stream.playing

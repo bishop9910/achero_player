@@ -63,10 +63,10 @@ class _LyricsViewState extends State<LyricsView> {
         _viewportHeight = constraints.maxHeight;
         return ListView.builder(
           controller: _scroll,
-          itemExtent: lineHeight,
+          itemExtent: lineHeight * 2,
           // 上下留白使首尾行也能滚动到居中。
           padding: EdgeInsets.symmetric(
-            vertical: (_viewportHeight - lineHeight) / 2,
+            vertical: (_viewportHeight - lineHeight * 2) / 2,
           ),
           itemCount: lyrics.lines.length,
           itemBuilder: (context, index) {
@@ -92,14 +92,14 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _scrollTo(int active, LyricSettings settings) {
     if (!_scroll.hasClients) return;
-    final lineHeight = _lineHeight;
+    final itemExtent = _lineHeight * 2;
     final anchor = switch (settings.alignment) {
       LyricAlignment.top => 0.0,
       LyricAlignment.bottom => 1.0,
       LyricAlignment.center => 0.5,
     };
-    final target = active * lineHeight -
-        (_viewportHeight - lineHeight) * anchor +
+    final target = active * itemExtent -
+        (_viewportHeight - itemExtent) * anchor +
         settings.verticalOffset;
     final clamped = target.clamp(0.0, _scroll.position.maxScrollExtent);
     _scroll.animateTo(
@@ -134,8 +134,9 @@ class _LyricLineTile extends StatelessWidget {
           style: style,
           child: Text(
             text,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
         ),
       ),

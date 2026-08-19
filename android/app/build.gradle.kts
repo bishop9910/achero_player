@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.achero_player"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_plugin_android_lifecycle 等插件要求 compileSdk >= 36。
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/player/player_controller.dart';
 import '../../core/plugins/plugin_registry.dart';
+import '../downloads/download_fab.dart';
 import '../library/library_page.dart';
 import '../player/now_playing_bar.dart';
 import '../player/player_page.dart';
@@ -22,7 +23,6 @@ class RootShell extends StatefulWidget {
 
 class _RootShellState extends State<RootShell> {
   int _index = 0;
-  int _playerIndex = 1;
   PlayerController? _player;
 
   @override
@@ -57,7 +57,6 @@ class _RootShellState extends State<RootShell> {
   Widget build(BuildContext context) {
     final registry = context.watch<PluginRegistry>();
     final destinations = _buildDestinations(registry);
-    _playerIndex = _indexOfPlayer(destinations);
 
     return Scaffold(
       body: SafeArea(
@@ -98,7 +97,18 @@ class _RootShellState extends State<RootShell> {
                   Expanded(
                     child: Column(
                       children: [
-                        Expanded(child: content),
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              content,
+                              const Positioned(
+                                right: 16,
+                                bottom: 12,
+                                child: DownloadFab(),
+                              ),
+                            ],
+                          ),
+                        ),
                         NowPlayingBar(onTap: _openPlayer),
                       ],
                     ),
@@ -109,19 +119,23 @@ class _RootShellState extends State<RootShell> {
 
             return Column(
               children: [
-                Expanded(child: content),
-                NowPlayingBar(onTap: _openPlayer),
-                NavigationBar(
-                  selectedIndex: _index.clamp(0, destinations.length - 1),
-                  onDestinationSelected: (i) => setState(() => _index = i),
-                  destinations: [
-                    for (final d in destinations)
-                      NavigationDestination(
-                        icon: Icon(d.icon),
-                        selectedIcon: Icon(d.selectedIcon),
-                        label: d.label,
+                Expanded(
+                  child: Stack(
+                    children: [
+                      content,
+                      const Positioned(
+                        right: 16,
+                        bottom: 12,
+                        child: DownloadFab(),
                       ),
-                  ],
+                    ],
+                  ),
+                ),
+                NowPlayingBar(onTap: _openPlayer),
+                _MobileNavBar(
+                  destinations: destinations,
+                  selectedIndex: _index.clamp(0, destinations.length - 1),
+                  onSelected: (i) => setState(() => _index = i),
                 ),
               ],
             );
@@ -132,12 +146,51 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _openPlayer() {
-    if (_playerIndex >= 0) setState(() => _index = _playerIndex);
-  }
-
-  int _indexOfPlayer(List<_Destination> destinations) {
-    final i = destinations.indexWhere((d) => d.isPlayer);
-    return i < 0 ? 0 : i;
+    final scheme = Theme.of(context).colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: true,
+      backgroundColor: scheme.surface,
+      builder: (context) => FractionallySizedBox(
+        heightFactor: 1.0,
+        child: Column(
+          children: [
+            // 顶部：下拉把手（手机往下滑退出）+ 关闭按钮。
+            SizedBox(
+              height: 44,
+              child: Stack(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: IconButton(
+                        tooltip: '收起',
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Expanded(child: PlayerPage()),
+          ],
+        ),
+      ),
+    );
   }
 
   List<_Destination> _buildDestinations(PluginRegistry registry) {
@@ -147,13 +200,6 @@ class _RootShellState extends State<RootShell> {
         icon: Icons.library_music_outlined,
         selectedIcon: Icons.library_music,
         builder: (_) => const LibraryPage(),
-      ),
-      _Destination(
-        label: '正在播放',
-        icon: Icons.album_outlined,
-        selectedIcon: Icons.album,
-        isPlayer: true,
-        builder: (_) => const PlayerPage(),
       ),
       _Destination(
         label: '播放列表',
@@ -178,18 +224,140 @@ class _RootShellState extends State<RootShell> {
   }
 }
 
+/// 手机端底部导航：单行文字 + 左右箭头横向滚动，避免文字换行挤压。
+class _MobileNavBar extends StatefulWidget {
+  const _MobileNavBar({
+    required this.destinations,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final List<_Destination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  State<_MobileNavBar> createState() => _MobileNavBarState();
+}
+
+class _MobileNavBarState extends State<_MobileNavBar> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollBy(double dx) {
+    if (!_scroll.hasClients) return;
+    final target = (_scroll.offset + dx)
+        .clamp(0.0, _scroll.position.maxScrollExtent);
+    _scroll.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainer,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () => _scrollBy(-140),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: _scroll,
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (var i = 0; i < widget.destinations.length; i++)
+                      _MobileNavItem(
+                        destination: widget.destinations[i],
+                        selected: i == widget.selectedIndex,
+                        onTap: () => widget.onSelected(i),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.chevron_right),
+                onPressed: () => _scrollBy(140),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileNavItem extends StatelessWidget {
+  const _MobileNavItem({
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _Destination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 76,
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(selected ? destination.selectedIcon : destination.icon,
+                color: color),
+            const SizedBox(height: 3),
+            Text(
+              destination.label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: color,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Destination {
   const _Destination({
     required this.label,
     required this.icon,
     required this.selectedIcon,
     required this.builder,
-    this.isPlayer = false,
   });
 
   final String label;
   final IconData icon;
   final IconData selectedIcon;
   final WidgetBuilder builder;
-  final bool isPlayer;
 }

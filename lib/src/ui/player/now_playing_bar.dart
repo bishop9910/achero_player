@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../core/player/player_controller.dart';
 import '../common/cover_art.dart';
 import '../common/formats.dart';
+import '../common/marquee_text.dart';
+import '../common/source_badge.dart';
 
 /// 停靠在底部的迷你播放条。
 ///
@@ -49,20 +51,26 @@ class NowPlayingBar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          track.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                track.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            SourceBadge(origin: track.origin),
+                          ],
                         ),
                         if (track.subtitle.isNotEmpty)
-                          Text(
-                            track.subtitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          MarqueeText(
+                            text: track.subtitle,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                       ],

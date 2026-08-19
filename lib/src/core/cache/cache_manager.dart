@@ -33,11 +33,13 @@ class CacheManager {
   String get rootDir => _rootDir;
   String get _audioDir => p.join(_rootDir, 'audio');
   String get _jsonDir => p.join(_rootDir, 'json');
+  String get _coversDir => p.join(_rootDir, 'covers');
 
   /// 确保缓存目录存在。
   Future<void> init() async {
     await _fs.ensureDirectory(_audioDir);
     await _fs.ensureDirectory(_jsonDir);
+    await _fs.ensureDirectory(_coversDir);
   }
 
   // ---------------------------------------------------------------------------
@@ -84,6 +86,28 @@ class CacheManager {
   }
 
   // ---------------------------------------------------------------------------
+  // 封面图片
+  // ---------------------------------------------------------------------------
+
+  String coverPath(String id) => p.join(_coversDir, '$id.img');
+
+  Future<bool> hasCover(String id) => _fs.exists(coverPath(id));
+
+  Future<Uint8List?> getCover(String id) async {
+    final path = coverPath(id);
+    if (!await _fs.exists(path)) return null;
+    return _fs.readBytes(path);
+  }
+
+  /// 写入封面并返回其绝对路径。
+  Future<String> putCover(String id, Uint8List bytes) async {
+    await _fs.ensureDirectory(_coversDir);
+    final path = coverPath(id);
+    await _fs.writeBytes(path, bytes);
+    return path;
+  }
+
+  // ---------------------------------------------------------------------------
   // 清理与统计
   // ---------------------------------------------------------------------------
 
@@ -91,7 +115,7 @@ class CacheManager {
   Future<int> cleanup({Duration? maxAge}) async {
     final cutoff = DateTime.now().subtract(maxAge ?? ttl);
     var deleted = 0;
-    for (final dir in [_audioDir, _jsonDir]) {
+    for (final dir in [_audioDir, _jsonDir, _coversDir]) {
       for (final file in await _fs.listFiles(dir)) {
         if (file.lastModified.isBefore(cutoff)) {
           await _fs.deleteFile(file.path);
@@ -105,7 +129,7 @@ class CacheManager {
   /// 清空整个缓存目录，返回删除的文件数。
   Future<int> clearAll() async {
     var deleted = 0;
-    for (final dir in [_audioDir, _jsonDir]) {
+    for (final dir in [_audioDir, _jsonDir, _coversDir]) {
       for (final file in await _fs.listFiles(dir)) {
         await _fs.deleteFile(file.path);
         deleted++;
@@ -117,7 +141,7 @@ class CacheManager {
   /// 当前缓存占用的字节总数。
   Future<int> totalSize() async {
     var size = 0;
-    for (final dir in [_audioDir, _jsonDir]) {
+    for (final dir in [_audioDir, _jsonDir, _coversDir]) {
       for (final file in await _fs.listFiles(dir)) {
         size += file.size;
       }

@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import '../models/track.dart';
 import '../platform/platform_filesystem.dart';
 import '../util/stable_id.dart';
+import 'audio_cover_reader.dart';
 import 'metadata_extractor.dart';
 
 /// 曲库扫描器：把磁盘目录转换为 [Track] 列表。
@@ -38,6 +39,7 @@ class LibraryScanner {
         album: meta.album,
         trackNumber: meta.trackNumber,
         source: FileTrackSource(file.path),
+        coverArtPath: await _extractAndCacheCover(file.path),
         lyricsPath: await _findLyrics(file.path),
       ));
     }
@@ -57,8 +59,24 @@ class LibraryScanner {
       album: meta.album,
       trackNumber: meta.trackNumber,
       source: FileTrackSource(path),
+      coverArtPath: await _extractAndCacheCover(path),
       lyricsPath: await _findLyrics(path),
     );
+  }
+
+  /// 从音频文件内嵌标签提取封面，缓存为同名 `.cover.jpg`；失败返回 null。
+  Future<String?> _extractAndCacheCover(String audioPath) async {
+    final head = await fs.readHeadBytes(audioPath, maxBytes: 1 << 20);
+    if (head == null) return null;
+    final cover = const AudioCoverReader().extract(head);
+    if (cover == null) return null;
+    final coverPath = '${p.withoutExtension(audioPath)}.cover.jpg';
+    try {
+      await fs.writeBytes(coverPath, cover);
+      return coverPath;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 若同名 `.lrc` 文件存在则返回其路径（供后续异步加载）。
