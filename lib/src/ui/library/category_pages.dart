@@ -18,6 +18,7 @@ class AlbumCard extends StatelessWidget {
     required this.artist,
     required this.trackCount,
     required this.onTap,
+    this.editing = false,
   });
 
   final Track? coverTrack;
@@ -25,6 +26,9 @@ class AlbumCard extends StatelessWidget {
   final String artist;
   final int trackCount;
   final VoidCallback onTap;
+
+  /// 编辑模式：封面右上角显示一个「编辑」小徽标。
+  final bool editing;
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +41,29 @@ class AlbumCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: coverTrack != null
-                  ? CoverArt(track: coverTrack!, borderRadius: 0, iconSize: 40)
-                  : _CoverFallback(iconSize: 40, scheme: scheme),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: coverTrack != null
+                      ? CoverArt(track: coverTrack!, borderRadius: 0, iconSize: 40)
+                      : _CoverFallback(iconSize: 40, scheme: scheme),
+                ),
+                if (editing)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.edit, size: 14, color: scheme.onPrimary),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 6),

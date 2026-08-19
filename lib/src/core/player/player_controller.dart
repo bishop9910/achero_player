@@ -440,6 +440,15 @@ class PlayerController extends ChangeNotifier {
   }
 
   void _onStatus(PlaybackStatus status) {
+    // 引擎的 statusStream 只表达「是否正在播放」（布尔）。当曲目已自然结束
+    // 或已出错时，引擎随后发出的 playing=false 不应把 completed/error/idle
+    // 覆盖回 paused——否则既干扰结尾处的错误判定，也会让「重新播放」语义错乱。
+    if (status == PlaybackStatus.paused &&
+        (_status == PlaybackStatus.completed ||
+            _status == PlaybackStatus.error ||
+            _status == PlaybackStatus.idle)) {
+      return;
+    }
     _status = status;
     notifyListeners();
   }
@@ -469,7 +478,14 @@ class PlayerController extends ChangeNotifier {
   /// 已加载成功则忽略该错误，否则才按致命错误处理。
   void _onEngineError(String message) {
     debugPrint('[AcheroPlayer] 引擎错误：$message');
-    if (_status == PlaybackStatus.error) return;
+
+    // 已出错 / 已自然结束 / 空闲：这时的引擎错误是历史或结尾（EOF）噪音，
+    // 不能据此报「播放失败」。
+    if (_status == PlaybackStatus.error ||
+        _status == PlaybackStatus.completed ||
+        _status == PlaybackStatus.idle) {
+      return;
+    }
 
     if (_status == PlaybackStatus.loading) {
       _pendingEngineError = message;
@@ -486,22 +502,39 @@ class PlayerController extends ChangeNotifier {
           await _startCurrent();
           return;
         }
-        _status = PlaybackStatus.error;
-        notifyListeners();
-        final track = currentTrack;
-        if (track != null) {
-          playbackError.value = _playbackErrorMessage(track, detail: pending);
-        }
+        _markEngineError(pending);
       });
       return;
     }
 
+    // playing / paused：曲目已成功播放到接近结尾时，libmpv 偶发的
+    // "Error decoding audio" 是结尾解码噪音（随后会收到 completed），
+    // 直接忽略，避免误报「播放失败」。
+    if (_isNearEnd()) {
+      debugPrint('[AcheroPlayer] 忽略结尾处解码噪音：$message');
+      return;
+    }
+
+    _markEngineError(message);
+  }
+
+  void _markEngineError(String detail) {
     _status = PlaybackStatus.error;
     notifyListeners();
     final track = currentTrack;
     if (track != null) {
-      playbackError.value = _playbackErrorMessage(track, detail: message);
+      playbackError.value = _playbackErrorMessage(track, detail: detail);
     }
+  }
+
+  /// 是否已接近曲目结尾（用于把 EOF 处的解码噪音与真错误区分开）。
+  bool _isNearEnd() {
+    if (!_mediaLoaded) return false;
+    final d = _duration;
+    if (d == null || d <= Duration.zero) return false;
+    final posMs = _position.inMilliseconds;
+    final durMs = d.inMilliseconds;
+    return (durMs - posMs) < 3000 || posMs >= (durMs * 0.95).floor();
   }
 
   @override

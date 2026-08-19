@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/audio/audio_engine.dart';
 import 'core/download/download_manager.dart';
+import 'core/library/album_overrides.dart';
 import 'core/library/library_catalog.dart';
 import 'core/library/music_library.dart';
 import 'core/platform/platform_filesystem.dart';
@@ -22,6 +23,7 @@ class AppServices {
     required this.fonts,
     required this.fs,
     required this.library,
+    required this.albumOverrides,
     required this.catalog,
     required this.engine,
     required this.player,
@@ -35,6 +37,7 @@ class AppServices {
   final FontManager fonts;
   final PlatformFileSystem fs;
   final MusicLibrary library;
+  final AlbumOverrides albumOverrides;
   final LibraryCatalog catalog;
   final AudioEngine engine;
   final PlayerController player;

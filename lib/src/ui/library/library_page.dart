@@ -6,6 +6,7 @@ import '../../core/library/music_library.dart';
 import '../../core/models/track.dart';
 import '../../core/player/player_controller.dart';
 import 'add_music.dart';
+import 'album_edit_page.dart';
 import 'category_pages.dart';
 import 'track_tile.dart';
 
@@ -130,15 +131,22 @@ class _SongsView extends StatelessWidget {
 // 专辑分栏
 // ---------------------------------------------------------------------------
 
-class _AlbumsView extends StatelessWidget {
+class _AlbumsView extends StatefulWidget {
   const _AlbumsView({required this.query});
 
   final String query;
 
   @override
+  State<_AlbumsView> createState() => _AlbumsViewState();
+}
+
+class _AlbumsViewState extends State<_AlbumsView> {
+  bool _editing = false;
+
+  @override
   Widget build(BuildContext context) {
     final catalog = context.watch<LibraryCatalog>();
-    final q = query.trim().toLowerCase();
+    final q = widget.query.trim().toLowerCase();
     final albums = q.isEmpty
         ? catalog.albums
         : catalog.albums
@@ -147,32 +155,115 @@ class _AlbumsView extends StatelessWidget {
                 a.artist.toLowerCase().contains(q))
             .toList(growable: false);
 
-    if (albums.isEmpty) {
-      return _EmptyLibrary(query: query, hasAny: catalog.albumCount > 0);
-    }
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 190,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.78,
-      ),
-      itemCount: albums.length,
-      itemBuilder: (context, index) {
-        final album = albums[index];
-        return AlbumCard(
-          coverTrack: catalog.coverTrackOf(album.key),
-          name: album.name,
-          artist: album.artist,
-          trackCount: album.trackCount,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => AlbumDetailPage(albumKey: album.key),
+    return Stack(
+      children: [
+        Column(
+          children: [
+            if (_editing) const _EditBanner(),
+            Expanded(
+              child: albums.isEmpty
+                  ? _EmptyLibrary(
+                      query: widget.query, hasAny: catalog.albumCount > 0)
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 190,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.78,
+                      ),
+                      itemCount: albums.length,
+                      itemBuilder: (context, index) {
+                        final album = albums[index];
+                        return AlbumCard(
+                          coverTrack: catalog.coverTrackOf(album.key),
+                          name: album.name,
+                          artist: album.artist,
+                          trackCount: album.trackCount,
+                          editing: _editing,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => _editing
+                                  ? AlbumEditPage(albumKey: album.key)
+                                  : AlbumDetailPage(albumKey: album.key),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+        if (catalog.albumCount > 0)
+          Positioned(
+            top: 8,
+            right: 12,
+            child: _EditFab(
+              editing: _editing,
+              onPressed: () => setState(() => _editing = !_editing),
             ),
           ),
-        );
-      },
+      ],
+    );
+  }
+}
+
+class _EditBanner extends StatelessWidget {
+  const _EditBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: scheme.primaryContainer,
+      padding: const EdgeInsets.fromLTRB(16, 8, 64, 8),
+      child: Row(
+        children: [
+          Icon(Icons.edit_outlined, size: 16, color: scheme.onPrimaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '编辑模式：点击专辑即可重新归类 / 重命名',
+              style: TextStyle(color: scheme.onPrimaryContainer, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditFab extends StatelessWidget {
+  const _EditFab({required this.editing, required this.onPressed});
+
+  final bool editing;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: editing ? '完成编辑' : '编辑专辑（处理重名专辑）',
+      child: Material(
+        shape: const CircleBorder(),
+        color: editing ? scheme.primary : scheme.surfaceContainerHighest,
+        elevation: 3,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: Icon(
+              editing ? Icons.check : Icons.edit_outlined,
+              size: 22,
+              color: editing ? scheme.onPrimary : scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

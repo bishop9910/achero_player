@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'app_services.dart';
 import 'core/download/download_manager.dart';
+import 'core/library/album_overrides.dart';
 import 'core/library/library_catalog.dart';
 import 'core/library/music_library.dart';
 import 'core/player/player_controller.dart';
@@ -26,6 +27,7 @@ class AcheroApp extends StatelessWidget {
         Provider<AppServices>.value(value: services),
         ChangeNotifierProvider<SettingsController>.value(value: services.settings),
         ChangeNotifierProvider<MusicLibrary>.value(value: services.library),
+        ChangeNotifierProvider<AlbumOverrides>.value(value: services.albumOverrides),
         ChangeNotifierProvider<LibraryCatalog>.value(value: services.catalog),
         ChangeNotifierProvider<PlayerController>.value(value: services.player),
         ChangeNotifierProvider<PluginRegistry>.value(value: services.plugins),

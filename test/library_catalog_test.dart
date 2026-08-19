@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:achero_player/src/core/library/album_overrides.dart';
 import 'package:achero_player/src/core/library/library_catalog.dart';
 import 'package:achero_player/src/core/library/music_library.dart';
 import 'package:achero_player/src/core/models/track.dart';
@@ -73,9 +74,12 @@ void main() {
   Future<MusicLibrary> makeLibrary() async =>
       MusicLibrary(prefs: await SharedPreferences.getInstance(), fs: _FakeFs());
 
+  Future<AlbumOverrides> makeOverrides() async =>
+      AlbumOverrides(await SharedPreferences.getInstance());
+
   test('按专辑 / 艺术家分组，专辑内按曲目号排序', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('1', '海阔天空', artist: 'Beyond', album: '乐与怒', trackNumber: 2),
@@ -98,7 +102,7 @@ void main() {
 
   test('缺失艺术家 / 专辑时归入「未知」兜底分组', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('1', '无元数据', artist: null, album: null),
@@ -111,7 +115,7 @@ void main() {
 
   test('同名专辑合并为一个分组（不同艺术家）', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('1', 'A', artist: 'X', album: 'Greatest Hits'),
@@ -128,7 +132,7 @@ void main() {
 
   test('本地与 RPC 相同专辑名合并为一个分组（同艺术家）', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('local', '本地歌', artist: 'Beyond', album: '乐与怒'),
@@ -143,9 +147,34 @@ void main() {
     expect(catalog.tracksOfAlbum(album.key).length, 2);
   });
 
+  test('专辑覆盖可把重名专辑拆分开', () async {
+    final library = await makeLibrary();
+    final overrides = await makeOverrides();
+    final catalog = LibraryCatalog(library, overrides);
+
+    library.addTracks([
+      _track('1', 'A1', artist: 'X', album: 'Greatest Hits'),
+      _track('2', 'A2', artist: 'Y', album: 'Greatest Hits'),
+    ]);
+    expect(catalog.albumCount, 1);
+
+    // 把第二首手动归到新专辑，拆开重名冲突。
+    await overrides.setOverride('2', 'Greatest Hits (2001)');
+    expect(catalog.albumCount, 2);
+    expect(catalog.albums.map((a) => a.name),
+        containsAll(['Greatest Hits', 'Greatest Hits (2001)']));
+    expect(catalog.tracksOfAlbum('Greatest Hits').single.id, '1');
+    expect(catalog.tracksOfAlbum('Greatest Hits (2001)').single.id, '2');
+
+    // 清除覆盖后回到自动合并。
+    await overrides.setOverride('2', null);
+    expect(catalog.albumCount, 1);
+    expect(catalog.albums.single.trackCount, 2);
+  });
+
   test('封面曲目优先取组内首个有封面的曲目', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('1', '无封面', artist: 'X', album: 'A'),
@@ -158,7 +187,7 @@ void main() {
 
   test('移除曲目后分组索引同步更新', () async {
     final library = await makeLibrary();
-    final catalog = LibraryCatalog(library);
+    final catalog = LibraryCatalog(library, await makeOverrides());
 
     library.addTracks([
       _track('1', 'A', artist: 'X', album: 'AL'),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/track.dart';
+import 'album_overrides.dart';
 import 'music_library.dart';
 
 /// 无艺术家 / 无专辑信息时使用的兜底显示名。
@@ -69,13 +70,18 @@ class AlbumGroup {
 /// 这是纯 Dart 核心组件（不依赖 Flutter UI），监听曲库变化并增量重建分组，
 /// 供曲库主页与详情页按专辑 / 艺术家浏览。所有曲目——本地、RPC、Subsonic——
 /// 只要带有 `artist` / `album` 字段即可参与分类。
+///
+/// 专辑名优先取 [AlbumOverrides] 中的用户手动覆盖，其次回退到曲目自带的
+/// `album` 字段；这样真正重名的专辑可由用户手动拆分 / 归并。
 class LibraryCatalog extends ChangeNotifier {
-  LibraryCatalog(this._library) {
+  LibraryCatalog(this._library, this._overrides) {
     _library.addListener(_rebuild);
+    _overrides.addListener(_rebuild);
     _rebuild();
   }
 
   final MusicLibrary _library;
+  final AlbumOverrides _overrides;
 
   List<ArtistGroup> _artists = const [];
   List<AlbumGroup> _albums = const [];
@@ -127,6 +133,7 @@ class LibraryCatalog extends ChangeNotifier {
   @override
   void dispose() {
     _library.removeListener(_rebuild);
+    _overrides.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -145,7 +152,7 @@ class LibraryCatalog extends ChangeNotifier {
       final artistKey = artistName.isEmpty ? kUnknownArtist : artistName;
       (artistAcc[artistKey] ??= []).add(track.id);
 
-      final albumName = _norm(track.album);
+      final albumName = _norm(_overrides.overrideFor(track.id) ?? track.album);
       final albumKey = albumName.isEmpty ? kUnknownAlbum : albumName;
       (albumAcc[albumKey] ??= []).add(track.id);
 
