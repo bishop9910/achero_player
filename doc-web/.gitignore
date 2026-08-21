@@ -1,0 +1,3 @@
+# Zensical 生成的产物与缓存（由 `zensical build` / CI 重新生成）
+site/
+.cache/

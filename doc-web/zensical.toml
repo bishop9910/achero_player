@@ -1,0 +1,141 @@
+# ============================================================================
+# Achero Player 文档站点配置
+# 由 Zensical 驱动，基于 Material for MkDocs 风格。
+# ============================================================================
+
+[project]
+
+site_name = "Achero Player"
+
+site_description = "Achero Player 纯 Dart 跨平台可插拔音乐播放器的开发文档：架构、插件、主题、歌词、音乐服务器与打包发布。"
+site_author = "bishop9910"
+
+# 部署到 GitHub Pages 后取消注释（注意末尾斜杠）
+#site_url = "https://bishop9910.github.io/achero_player/"
+
+copyright = "MIT License · Achero Player"
+
+# ----------------------------------------------------------------------------
+# 显式导航：按主题分组的侧边栏
+# ----------------------------------------------------------------------------
+nav = [
+  { "概览" = "index.md" },
+  { "架构设计" = "architecture.md" },
+  { "插件系统" = [
+      { "编译侧插件" = "plugins.md" },
+      { "运行时脚本插件" = "runtime-plugins.md" },
+  ] },
+  { "主题与外观" = [
+      { "主题 / 字体 / 歌词" = "theme.md" },
+      { "桌面歌词窗口" = "desktop-lyrics.md" },
+  ] },
+  { "音乐服务器" = [
+      { "RPC 协议" = "rpc.md" },
+      { "Subsonic 源" = "subsonic.md" },
+  ] },
+  { "打包发布" = "build.md" },
+]
+
+# 额外 CSS（相对于 docs_dir）
+extra_css = ["stylesheets/extra.css"]
+
+# 页脚社交链接
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/bishop9910/achero_player"
+
+# ----------------------------------------------------------------------------
+# 主题配置
+# ----------------------------------------------------------------------------
+[project.theme]
+
+# 现代（modern）风格为默认；改为 "classic" 使用传统外观
+#variant = "classic"
+
+# 站点图标与 favicon（相对于 docs_dir）
+logo = "assets/logo.png"
+favicon = "assets/favicon.png"
+
+# 界面语言：中文
+language = "zh"
+
+# 功能开关
+features = [
+    "announce.dismiss",
+    "content.code.annotate",
+    "content.code.copy",
+    "content.code.select",
+    "content.footnote.tooltips",
+    "content.tabs.link",
+    "content.tooltips",
+    "navigation.expand",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.instant",
+    "navigation.instant.prefetch",
+    "navigation.path",
+    "navigation.sections",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+    "toc.follow",
+]
+
+# 字体
+[project.theme.font]
+text = "Inter"
+code = "JetBrains Mono"
+
+# 配色方案（亮色 / 暗色）
+[[project.theme.palette]]
+scheme = "default"
+primary = "deep purple"
+accent = "indigo"
+toggle.icon = "lucide/sun"
+toggle.name = "切换到暗色模式"
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "deep purple"
+accent = "indigo"
+toggle.icon = "lucide/moon"
+toggle.name = "切换到亮色模式"
+
+# ----------------------------------------------------------------------------
+# Markdown 扩展
+# ----------------------------------------------------------------------------
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.def_list]
+[project.markdown_extensions.footnotes]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.toc]
+permalink = true
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true
+[project.markdown_extensions.pymdownx.betterem]
+[project.markdown_extensions.pymdownx.caret]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.keys]
+[project.markdown_extensions.pymdownx.magiclink]
+[project.markdown_extensions.pymdownx.mark]
+[project.markdown_extensions.pymdownx.smartsymbols]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+combine_header_slug = true
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true
+[project.markdown_extensions.pymdownx.tilde]
