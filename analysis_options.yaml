@@ -16,6 +16,7 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - third_party/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
@@ -36,10 +37,6 @@ linter:
     # 依赖注入容器常用「公开参数名 → 私有字段名」的赋值方式，
     # 此时 `this._field` 初始形式会破坏公开 API，故关闭该风格建议。
     prefer_initializing_formals: false
-
-analyzer:
-  exclude:
-    - third_party/**
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
