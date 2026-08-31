@@ -119,8 +119,12 @@ void onSettingsAction(Function call, String action) {
 | `title` | String | 标题 |
 | `subtitle` | String | 副标题 |
 | `trailing` | String | 右侧文字（设置项缺省显示箭头） |
-| `action` | String | 点击后回传给 `onPageAction` / `onSettingsAction` |
+| `action` | String | 点击后回传给 `onPageAction` / `onSettingsAction`；`play:<id>` 前缀由宿主直接播放该曲目 |
 | `color` | int | ARGB 颜色，行**右侧**渲染一个色点（如主题预设） |
+| `header` | String | 分组标题行（pageRows 专用，如「单曲排行」） |
+| `sortValue` | num | 分组内排序值（pageRows + `page.sort`） |
+| `trackId` | String | 曲目 id（pageRows，用于多选 / 播放定位） |
+| `coverPath` / `coverUrl` | String | 封面本地路径 / 网络地址（pageRows，行左侧缩略图） |
 
 ### 2.4 事件：`onEvent`
 
@@ -156,8 +160,10 @@ void onUnload(Function call) {}
 | `prefsSet` | `{key, value}` | - |
 | `prefsGetInt` / `prefsSetInt` | `{key}` / `{key, value}` | `int?` / - |
 | `prefsRemove` | `{key}` | - |
-| `listTracks` | `{}` | JSON 数组 `[{id,title,artist,album}]` |
+| `listTracks` | `{}` | JSON 数组 `[{id,title,artist,album,coverPath,coverUrl}]` |
+| `listPlaylists` | `{}` | JSON 数组 `[{name,trackIds}]` |
 | `trackCount` | `{}` | `int` |
+| `playTrack` | `{id}` | -（按曲目 id 播放） |
 | `setSeedColor` | `{argb}` | -（改主题种子色） |
 | `getSeedColor` | `{}` | `int` |
 | `setBrightness` | `{value: light/dark/system}` | - |
@@ -171,7 +177,7 @@ void onUnload(Function call) {}
 
 仓库自带两个脚本插件：
 
-**`assets/plugins/statistics_plugin.dart`（播放统计）** —— 演示事件 + 持久化 + 页面：
+**`assets/plugins/statistics_plugin.dart`（播放统计）** —— 演示事件 + 持久化 + 页面，内置单曲 / 专辑 / 播放列表三榜排行：
 
 ```dart
 import 'dart:convert';
@@ -180,10 +186,10 @@ String manifest(Function call) {
   return jsonEncode({
     'id': 'com.achero.statistics',
     'name': '播放统计',
-    'version': '1.0.0',
-    'description': '记录每首曲目的播放次数并展示排行榜',
+    'version': '1.4.0',
+    'description': '记录播放次数并展示单曲、专辑、播放列表排行',
     'icon': 'bar_chart',
-    'page': {'id': 'com.achero.statistics.page', 'title': '播放统计', 'icon': 'bar_chart'},
+    'page': {'id': 'com.achero.statistics.page', 'title': '播放统计', 'icon': 'bar_chart', 'sort': true},
     'events': ['trackStarted'],
   });
 }
@@ -221,6 +227,12 @@ String pageRows(Function call) {
   return jsonEncode(out);
 }
 ```
+
+!!! note "完整实现"
+
+    除单曲排行外，真实插件还按 `album` 累加出「专辑排行」、按播放列表
+    `trackIds` 累加出「播放列表排行」；行内带 `coverPath/coverUrl` 封面缩略图、
+    `action: 'play:<id>'` 点击播放、`trackId` 支持多选批量操作。
 
 **`assets/plugins/theme_presets_plugin.dart`（主题预设）** —— 演示设置区块 + 修改宿主主题：
 

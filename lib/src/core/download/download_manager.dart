@@ -95,6 +95,17 @@ class DownloadManager extends ChangeNotifier {
     return true;
   }
 
+  /// 批量下载多首曲目，返回成功开始的任务数。
+  ///
+  /// 本地曲目（无服务器地址/缓存）会被跳过，与单曲 [download] 行为一致。
+  Future<int> downloadAll(Iterable<Track> tracks) async {
+    var started = 0;
+    for (final track in tracks) {
+      if (await download(track)) started++;
+    }
+    return started;
+  }
+
   Future<void> _run(
       DownloadTask task, Track track, CacheManager cache, String url) async {
     try {

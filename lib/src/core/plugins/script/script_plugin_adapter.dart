@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dart_eval/dart_eval_bridge.dart';
 import 'package:dart_eval/stdlib/core.dart';
 import 'package:flutter/material.dart';
 
+import '../../../ui/library/playlist_picker.dart';
+import '../../platform/platform_filesystem.dart';
 import '../../settings/app_settings.dart';
 import '../plugin_types.dart';
 import 'compiled_script.dart';
@@ -195,6 +198,24 @@ class ScriptPluginAdapter extends AcheroPlugin {
               'title': t.title,
               'artist': t.artist,
               'album': t.album,
+              'coverPath': t.coverArtPath,
+              'coverUrl': t.coverArtUrl,
+            },
+        ]);
+      case 'playTrack':
+        final playCtx = ctx;
+        final track = playCtx?.library.trackById(params['id'].toString());
+        if (track != null && playCtx != null) {
+          playCtx.player.playTrack(track);
+        }
+        return null;
+      case 'listPlaylists':
+        final playlists = ctx?.library.playlists ?? const [];
+        return jsonEncode([
+          for (final pl in playlists)
+            {
+              'name': pl.name,
+              'trackIds': pl.trackIds,
             },
         ]);
       case 'trackCount':
@@ -290,6 +311,10 @@ class _ScriptRow {
     this.action,
     this.color,
     this.sortValue,
+    this.coverPath,
+    this.coverUrl,
+    this.header,
+    this.trackId,
   });
 
   final String title;
@@ -300,8 +325,20 @@ class _ScriptRow {
   /// 可选的 ARGB 颜色，用于在行左侧渲染一个色点。
   final int? color;
 
-  /// 可选的排序值：当页面声明了 `sort` 时，宿主据此排序。
+  /// 可选的排序值：当页面声明了 `sort` 时，宿主据此在各自分组内排序。
   final num? sortValue;
+
+  /// 封面本地路径（可空）。
+  final String? coverPath;
+
+  /// 封面网络地址（可空）。
+  final String? coverUrl;
+
+  /// 非空表示这是一个分组标题行，渲染为小标题而非曲目行。
+  final String? header;
+
+  /// 曲目 id（供多选 / 播放定位）。
+  final String? trackId;
 
   factory _ScriptRow.fromJson(Map<String, dynamic> json) => _ScriptRow(
         title: json['title']?.toString() ?? '',
@@ -310,6 +347,10 @@ class _ScriptRow {
         action: json['action']?.toString(),
         color: (json['color'] as num?)?.toInt(),
         sortValue: json['sortValue'] as num?,
+        coverPath: json['coverPath']?.toString(),
+        coverUrl: json['coverUrl']?.toString(),
+        header: json['header']?.toString(),
+        trackId: json['trackId']?.toString(),
       );
 }
 
@@ -325,6 +366,9 @@ class _ScriptPage extends StatefulWidget {
 class _ScriptPageState extends State<_ScriptPage> {
   List<_ScriptRow> _rows = const [];
   String _sortDir = 'desc';
+  final Set<String> _selectedIds = {};
+
+  bool get _selectionMode => _selectedIds.isNotEmpty;
 
   @override
   void initState() {
@@ -339,20 +383,116 @@ class _ScriptPageState extends State<_ScriptPage> {
         : widget.adapter._readRows('pageRows');
     if (sortable) {
       // 排序放在宿主（纯 Dart）进行，避免依赖 dart_eval 里不可靠的 List.sort。
-      rows = List.of(rows);
-      rows.sort((a, b) {
-        final av = a.sortValue ?? 0;
-        final bv = b.sortValue ?? 0;
-        return _sortDir == 'desc' ? bv.compareTo(av) : av.compareTo(bv);
-      });
+      // 按 header 分组，组内排序，保证分组标题不被混排。
+      rows = _sortSections(rows);
     }
     debugPrint('[ScriptPage] 刷新 sortDir=$_sortDir 行数=${rows.length}');
     if (mounted) setState(() => _rows = rows);
   }
 
+  List<_ScriptRow> _sortSections(List<_ScriptRow> rows) {
+    final result = <_ScriptRow>[];
+    var section = <_ScriptRow>[];
+    void flush() {
+      final sorted = List.of(section);
+      sorted.sort((a, b) {
+        final av = a.sortValue ?? 0;
+        final bv = b.sortValue ?? 0;
+        return _sortDir == 'desc' ? bv.compareTo(av) : av.compareTo(bv);
+      });
+      result.addAll(sorted);
+      section = [];
+    }
+
+    for (final row in rows) {
+      if (row.header != null) {
+        flush();
+        result.add(row);
+      } else {
+        section.add(row);
+      }
+    }
+    flush();
+    return result;
+  }
+
+  void _toggle(_ScriptRow row) {
+    final id = row.trackId;
+    if (id == null) return;
+    setState(() {
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
+    });
+  }
+
+  /// 行点击：`play:` 前缀由宿主直接播放曲目，其余转发给脚本的
+  /// `onPageAction`（dart_eval 里做字符串解析不可靠，故放在宿主）。
+  void _handleTap(_ScriptRow row) {
+    final action = row.action;
+    if (action != null && action.startsWith('play:')) {
+      final id = action.substring('play:'.length);
+      final library = widget.adapter._context?.library;
+      final player = widget.adapter._context?.player;
+      final track = library?.trackById(id);
+      if (track != null) player?.playTrack(track);
+      return;
+    }
+    widget.adapter._fireAction('onPageAction', action);
+  }
+
+  List<String> _selectedTrackIds() => _selectedIds.toList(growable: false);
+
+  Future<void> _addSelectedToPlaylist() async {
+    await showAddToPlaylistSheet(context, _selectedTrackIds());
+    if (mounted) setState(_selectedIds.clear);
+  }
+
+  Future<void> _removeSelected() async {
+    final library = widget.adapter._context?.library;
+    if (library == null) return;
+    final count = _selectedIds.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('从曲库移除'),
+        content: Text('确定要移除选中的 $count 首曲目吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      library.removeTracks(_selectedTrackIds());
+      if (mounted) setState(_selectedIds.clear);
+    }
+  }
+
+  Future<void> _downloadSelected() async {
+    final library = widget.adapter._context?.library;
+    final downloads = widget.adapter._context?.downloads;
+    if (library == null || downloads == null) return;
+    final tracks = library.tracksByIds(_selectedTrackIds());
+    final started = await downloads.downloadAll(tracks);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            started > 0 ? '已开始下载 $started 首' : '无法下载：缺少缓存或服务器地址'),
+        duration: const Duration(milliseconds: 1500),
+      ));
+      setState(_selectedIds.clear);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sortable = widget.adapter.pageSortable;
+    final scheme = Theme.of(context).colorScheme;
 
     final list = _rows.isEmpty
         ? ListView(
@@ -365,7 +505,37 @@ class _ScriptPageState extends State<_ScriptPage> {
             itemCount: _rows.length,
             itemBuilder: (context, index) {
               final row = _rows[index];
-              return ListTile(
+              if (row.header != null) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Text(
+                    row.header!,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                );
+              }
+              final selected =
+                  row.trackId != null && _selectedIds.contains(row.trackId);
+              final tile = ListTile(
+                leading: _selectionMode
+                    ? (row.trackId == null
+                        ? null
+                        : Icon(
+                            selected
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            color: selected
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant,
+                          ))
+                    : _ScriptCover(
+                        fs: widget.adapter._context?.fs,
+                        path: row.coverPath,
+                        url: row.coverUrl,
+                      ),
                 title: Text(row.title,
                     maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: row.subtitle == null
@@ -375,41 +545,182 @@ class _ScriptPageState extends State<_ScriptPage> {
                 trailing: row.color != null
                     ? _ColorDot(color: row.color!)
                     : (row.trailing == null ? null : Text(row.trailing!)),
-                onTap: () => widget.adapter._fireAction('onPageAction', row.action),
+                onTap: _selectionMode
+                    ? () => _toggle(row)
+                    : () => _handleTap(row),
+                onLongPress: _selectionMode
+                    ? null
+                    : (row.trackId == null ? null : () => _toggle(row)),
+              );
+              // 桌面端：右键等同于长按，进入/退出多选（无 trackId 的行忽略）。
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onSecondaryTap: () => _toggle(row),
+                child: tile,
               );
             },
           );
 
     return RefreshIndicator(
       onRefresh: () async => _reload(),
-      child: sortable
-          ? Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      TextButton.icon(
-                        icon: Icon(
-                          _sortDir == 'desc'
-                              ? Icons.arrow_downward
-                              : Icons.arrow_upward,
-                          size: 18,
-                        ),
-                        label: Text(_sortDir == 'desc' ? '倒序' : '正序'),
-                        onPressed: () {
-                          _sortDir = _sortDir == 'desc' ? 'asc' : 'desc';
-                          _reload();
-                        },
-                      ),
-                    ],
+      child: Column(
+        children: [
+          if (sortable)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  TextButton.icon(
+                    icon: Icon(
+                      _sortDir == 'desc'
+                          ? Icons.arrow_downward
+                          : Icons.arrow_upward,
+                      size: 18,
+                    ),
+                    label: Text(_sortDir == 'desc' ? '倒序' : '正序'),
+                    onPressed: () {
+                      _sortDir = _sortDir == 'desc' ? 'asc' : 'desc';
+                      _reload();
+                    },
                   ),
+                ],
+              ),
+            ),
+          if (_selectionMode)
+            _ScriptSelectionBar(
+              count: _selectedIds.length,
+              onClose: () => setState(_selectedIds.clear),
+              onAddToPlaylist: _addSelectedToPlaylist,
+              onDownload: _downloadSelected,
+              onRemove: _removeSelected,
+            ),
+          Expanded(child: list),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScriptCover extends StatefulWidget {
+  const _ScriptCover({required this.fs, required this.path, required this.url});
+
+  final PlatformFileSystem? fs;
+  final String? path;
+  final String? url;
+
+  @override
+  State<_ScriptCover> createState() => _ScriptCoverState();
+}
+
+class _ScriptCoverState extends State<_ScriptCover> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_ScriptCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) _load();
+  }
+
+  Future<void> _load() async {
+    final path = widget.path;
+    final fs = widget.fs;
+    if (path == null || path.isEmpty || fs == null) return;
+    final bytes = await fs.readBytes(path);
+    if (mounted) setState(() => _bytes = bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Icon(Icons.music_note,
+        color: Theme.of(context).colorScheme.outline, size: 20);
+    final bytes = _bytes;
+    final Widget child;
+    if (bytes != null) {
+      child = Image.memory(bytes,
+          fit: BoxFit.cover,
+          width: 36,
+          height: 36,
+          errorBuilder: (_, _, _) => fallback);
+    } else if (widget.url != null && widget.url!.isNotEmpty) {
+      child = Image.network(widget.url!,
+          fit: BoxFit.cover,
+          width: 36,
+          height: 36,
+          errorBuilder: (_, _, _) => fallback);
+    } else {
+      child = fallback;
+    }
+    return ClipOval(child: SizedBox(width: 36, height: 36, child: child));
+  }
+}
+
+class _ScriptSelectionBar extends StatelessWidget {
+  const _ScriptSelectionBar({
+    required this.count,
+    required this.onClose,
+    required this.onAddToPlaylist,
+    required this.onDownload,
+    required this.onRemove,
+  });
+
+  final int count;
+  final VoidCallback onClose;
+  final VoidCallback onAddToPlaylist;
+  final VoidCallback onDownload;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: '退出多选',
+              icon: const Icon(Icons.close),
+              color: scheme.onPrimaryContainer,
+              onPressed: onClose,
+            ),
+            Expanded(
+              child: Text(
+                '已选 $count 首',
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
                 ),
-                Expanded(child: list),
-              ],
-            )
-          : list,
+              ),
+            ),
+            IconButton(
+              tooltip: '添加到歌单',
+              icon: const Icon(Icons.playlist_add),
+              color: scheme.onPrimaryContainer,
+              onPressed: onAddToPlaylist,
+            ),
+            IconButton(
+              tooltip: '下载',
+              icon: const Icon(Icons.download_outlined),
+              color: scheme.onPrimaryContainer,
+              onPressed: onDownload,
+            ),
+            IconButton(
+              tooltip: '从曲库移除',
+              icon: const Icon(Icons.delete_outline),
+              color: scheme.onPrimaryContainer,
+              onPressed: onRemove,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

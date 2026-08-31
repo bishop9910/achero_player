@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_info.dart';
+import '../common/version_dialog.dart';
 import 'appearance_settings_page.dart';
 import 'library_settings_page.dart';
 import 'lyrics_settings_page.dart';
@@ -43,6 +45,12 @@ class SettingsPage extends StatelessWidget {
           title: '插件',
           subtitle: '启用 / 禁用插件',
           onTap: () => _push(context, const PluginSettingsPage()),
+        ),
+        _NavTile(
+          icon: Icons.new_releases_outlined,
+          title: '更新日志',
+          subtitle: '版本信息 · 更新内容',
+          onTap: () => showVersionDialog(context),
         ),
         const _AboutTile(),
       ],
@@ -91,7 +99,6 @@ class _AboutTile extends StatelessWidget {
 
   /// 作者列表
   static const List<String> authors = ['bishop9910'];
-  static const String version = "v1.0.4+0";
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +111,7 @@ class _AboutTile extends StatelessWidget {
           child: Icon(Icons.music_note),
         ),
         title: const Text('应用介绍'),
-        subtitle: Text('$version · 关于 · 作者 · 许可'),
+        subtitle: Text('v$kAppVersionWithBuild · 关于 · 作者 · 许可'),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _showAbout(context),
       ),
@@ -129,8 +136,10 @@ class _AboutTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(version, style: Theme.of(context).textTheme.bodySmall),
-            Text('2026/8/19', style: Theme.of(context).textTheme.bodySmall),
+            Text('v$kAppVersionWithBuild',
+                style: Theme.of(context).textTheme.bodySmall),
+            Text(kAppReleaseDate,
+                style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
             const Text('一个可深度自定义、支持插件的跨平台音乐播放器。'),
             const SizedBox(height: 16),
@@ -156,8 +165,8 @@ class _AboutTile extends StatelessWidget {
           TextButton(
             onPressed: () => showLicensePage(
               context: context,
-              applicationName: 'Achero Player',
-              applicationVersion: '1.0.3',
+              applicationName: AppInfo.name,
+              applicationVersion: kAppVersion,
               applicationIcon: const Icon(Icons.music_note),
             ),
             child: const Text('查看许可'),

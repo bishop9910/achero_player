@@ -40,6 +40,13 @@ dependencies:
   # Subsonic/OpenSubsonic 音乐服务器鉴权需要 MD5（token = md5(password + salt)）
   crypto: ^3.0.3
 
+  # 安卓后台播放：前台服务 + 通知栏播放控制 + 耳机/锁屏按键 + 音频焦点
+  audio_service: ^0.18.18
+
+  # 桌面端系统媒体控制：Linux MPRIS（audio_service 平台实现）+ Windows SMTC
+  audio_service_mpris: ^0.2.0
+  smtc_windows: ^1.0.0
+
   # 运行时脚本插件引擎：在 Dart 内解释执行 Dart 子集（插件为独立 .dart 文件）
   dart_eval: ^0.8.5
 
@@ -64,6 +71,12 @@ dev_dependencies:
 dependency_overrides:
   media_kit_libs_windows_audio:
     path: third_party/media_kit_libs_windows_audio
+
+  # smtc_windows 自带的 cargokit resolve_symlinks.ps1 无法解析隐藏目录（如 AppData），
+  # 导致 Windows 构建报「找不到项」。此处指向本地打了补丁的副本（third_party/ 下，
+  # 已给 Get-Item 加 -Force / SilentlyContinue），待上游修复后可删除。
+  smtc_windows:
+    path: third_party/smtc_windows
 
 flutter:
   uses-material-design: true

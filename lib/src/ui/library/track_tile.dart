@@ -7,8 +7,12 @@ import '../../core/models/track.dart';
 import '../../core/player/player_controller.dart';
 import '../common/cover_art.dart';
 import '../common/marquee_text.dart';
+import 'playlist_picker.dart';
 
-/// 曲目列表项：点击播放，右键菜单提供播放列表 / 收藏 / 移除操作。
+/// 曲目列表项：点击播放，右侧「更多」菜单提供播放列表 / 收藏 / 移除操作。
+///
+/// 多选模式下（[selectionMode]）隐藏更多菜单，改为左侧选择标记，点击切换
+/// 选中状态（用于曲库批量操作）。进入多选的手势：长按（触屏）或右键（桌面）。
 class TrackTile extends StatelessWidget {
   const TrackTile({
     super.key,
@@ -18,6 +22,10 @@ class TrackTile extends StatelessWidget {
     this.isPlaying = false,
     this.onTap,
     this.onRemove,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onSelectedChanged,
+    this.onLongPress,
   });
 
   final Track track;
@@ -26,6 +34,10 @@ class TrackTile extends StatelessWidget {
   final bool isPlaying;
   final VoidCallback? onTap;
   final VoidCallback? onRemove;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback? onSelectedChanged;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -34,18 +46,24 @@ class TrackTile extends StatelessWidget {
     final library = context.read<MusicLibrary>();
     final downloads = context.read<AppServices>().downloads;
 
-    return ListTile(
-      onTap: onTap,
+    final tile = ListTile(
+      onTap: selectionMode ? onSelectedChanged : onTap,
+      onLongPress: selectionMode ? null : onLongPress,
       // 手机屏幕窄，压缩标题与前后元素的间距，给歌名留出更多宽度。
       horizontalTitleGap: 8,
       minLeadingWidth: 28,
-      leading: _Leading(
-        track: track,
-        index: index,
-        isCurrent: isCurrent,
-        isPlaying: isPlaying,
-        scheme: scheme,
-      ),
+      leading: selectionMode
+          ? Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected ? scheme.primary : scheme.onSurfaceVariant,
+            )
+          : _Leading(
+              track: track,
+              index: index,
+              isCurrent: isCurrent,
+              isPlaying: isPlaying,
+              scheme: scheme,
+            ),
       title: Text(
         track.title,
         maxLines: 1,
@@ -61,7 +79,9 @@ class TrackTile extends StatelessWidget {
               text: track.subtitle,
               style: Theme.of(context).textTheme.bodySmall,
             ),
-      trailing: PopupMenuButton<_TrackAction>(
+      trailing: selectionMode
+          ? null
+          : PopupMenuButton<_TrackAction>(
         tooltip: '更多操作',
         icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
         onSelected: (action) async {
@@ -73,7 +93,7 @@ class TrackTile extends StatelessWidget {
               library.toggleFavorite(track.id);
               break;
             case _TrackAction.addToPlaylist:
-              await _showPlaylistPicker(context, track);
+              await showAddToPlaylistSheet(context, [track.id]);
               break;
             case _TrackAction.download:
               final ok = await downloads.download(track);
@@ -107,45 +127,17 @@ class TrackTile extends StatelessWidget {
         ],
       ),
     );
-  }
 
-  Future<void> _showPlaylistPicker(BuildContext context, Track track) async {
-    final library = context.read<MusicLibrary>();
-    final playlists = library.playlists.where((p) => !p.isFavorite).toList();
-
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text('添加到播放列表',
-                  style: Theme.of(context).textTheme.titleMedium),
-            ),
-            if (playlists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('还没有播放列表，先去「播放列表」页创建一个吧'),
-              ),
-            for (final pl in playlists)
-              ListTile(
-                leading: const Icon(Icons.queue_music),
-                title: Text(pl.name),
-                subtitle: Text('${pl.trackCount} 首'),
-                onTap: () {
-                  library.addToPlaylist(pl.id, track.id);
-                  Navigator.pop(context);
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+    // 桌面端：右键（次要点按）等同于长按，进入/退出多选。
+    // 仅在提供 onSelectedChanged（即支持多选的列表）时启用。
+    if (onSelectedChanged == null) return tile;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTap: onSelectedChanged,
+      child: tile,
     );
   }
+
 }
 
 class _Leading extends StatelessWidget {

@@ -1,7 +1,8 @@
 # Achero Player 架构说明
 
-Achero 追求**核心逻辑纯 Dart、依赖显式注入、可插拔**。除「桌面歌词多窗口」
-外，跨平台能力均无原生代码；磁盘与文件操作经平台抽象隔离。
+Achero 追求**核心逻辑纯 Dart、依赖显式注入、可插拔**。除「桌面歌词多窗口」与
+「系统级后台播放联动」两处外，跨平台能力均复用现有插件、无自定义原生代码；
+磁盘与文件操作经平台抽象隔离。
 
 ```
 lib/src/
@@ -176,14 +177,31 @@ Achero 有**两类插件**，统一接入同一个 `PluginRegistry`：
 
 ---
 
-## 8. 桌面歌词多窗口（原生例外）
+## 8. 系统集成（原生例外）
+
+跨平台能力绝大多数是纯 Dart，只有两处复用原生插件：
+
+### 8.1 桌面歌词多窗口
 
 `desktop_lyrics_plugin` + `lib/src/desktop_lyrics/` 用
 [`desktop_multi_window`](https://pub.dev/packages/desktop_multi_window) +
 [`window_manager`](https://pub.dev/packages/window_manager) 创建独立的无边框、
-透明、置顶歌词窗口。这是**唯一需要原生改动的功能**（`windows/runner`、
-`linux/runner` 各加了一处子窗口插件注册回调），仅桌面端可用，见
-`docs/DESKTOP_LYRICS.md`。
+透明、置顶歌词窗口（`windows/runner`、`linux/runner` 各加了一处子窗口插件注册
+回调），仅桌面端可用，见 `docs/DESKTOP_LYRICS.md`。
+
+### 8.2 系统级后台播放联动
+
+让播放状态进入系统媒体控制条 / 通知栏，实现锁屏、耳机按键与系统媒体条控制：
+
+| 平台 | 插件 | 效果 |
+| --- | --- | --- |
+| Android | `audio_service` | 前台服务 + 通知栏播放控制 + 音频焦点 |
+| Linux | `audio_service` + `audio_service_mpris` | MPRIS 媒体控制 |
+| Windows | `smtc_windows`（Rust 插件） | SMTC 系统媒体传输控制条 |
+
+初始化集中在 `lib/main.dart` 的 `_initBackgroundAudio`：Windows 走
+`WindowsSmcController`，其余平台走 `AudioService.init`，统一桥接到同一个
+`PlayerController`。Windows 构建需 Rust 工具链（见 `docs/BUILD.md`）。
 
 ---
 

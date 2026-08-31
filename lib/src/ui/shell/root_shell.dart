@@ -77,66 +77,56 @@ class _RootShellState extends State<RootShell> {
               ],
             );
 
-            if (wide) {
-              return Row(
-                children: [
-                  NavigationRail(
-                    selectedIndex: _index.clamp(0, destinations.length - 1),
-                    onDestinationSelected: (i) => setState(() => _index = i),
-                    labelType: NavigationRailLabelType.all,
-                    destinations: [
-                      for (final d in destinations)
-                        NavigationRailDestination(
-                          icon: Icon(d.icon),
-                          selectedIcon: Icon(d.selectedIcon),
-                          label: Text(d.label),
-                        ),
-                    ],
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              content,
-                              const Positioned(
-                                right: 16,
-                                bottom: 12,
-                                child: DownloadFab(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        NowPlayingBar(onTap: _openPlayer),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }
-
+            // 内容区始终保持在相同的结构位置（Column → Expanded → Row →
+            // Expanded → Stack），只在 Row 前缀切换 NavigationRail、在 Column
+            // 尾部切换底部导航。这样跨越 720px 断点时 Flutter 能复用现有
+            // Element，页面 State（如 RPC 连接状态、已拉取的曲目列表）不会
+            // 被销毁重建，避免「连接中切换宽度导致按钮恢复可点、数据丢失」。
             return Column(
               children: [
                 Expanded(
-                  child: Stack(
+                  child: Row(
                     children: [
-                      content,
-                      const Positioned(
-                        right: 16,
-                        bottom: 12,
-                        child: DownloadFab(),
+                      if (wide) ...[
+                        NavigationRail(
+                          selectedIndex: selectedIndex,
+                          onDestinationSelected: (i) =>
+                              setState(() => _index = i),
+                          labelType: NavigationRailLabelType.all,
+                          destinations: [
+                            for (final d in destinations)
+                              NavigationRailDestination(
+                                icon: Icon(d.icon),
+                                selectedIcon: Icon(d.selectedIcon),
+                                label: Text(d.label),
+                              ),
+                          ],
+                          minWidth: 120,
+                        ),
+                        const VerticalDivider(width: 1),
+                      ],
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            content,
+                            const Positioned(
+                              right: 16,
+                              bottom: 12,
+                              child: DownloadFab(),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
                 NowPlayingBar(onTap: _openPlayer),
-                _MobileNavBar(
-                  destinations: destinations,
-                  selectedIndex: _index.clamp(0, destinations.length - 1),
-                  onSelected: (i) => setState(() => _index = i),
-                ),
+                if (!wide)
+                  _MobileNavBar(
+                    destinations: destinations,
+                    selectedIndex: selectedIndex,
+                    onSelected: (i) => setState(() => _index = i),
+                  ),
               ],
             );
           },

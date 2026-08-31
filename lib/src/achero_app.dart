@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_services.dart';
+import 'core/app_info.dart';
 import 'core/download/download_manager.dart';
 import 'core/library/album_overrides.dart';
 import 'core/library/library_catalog.dart';
@@ -11,6 +13,7 @@ import 'core/plugins/plugin_registry.dart';
 import 'core/settings/settings_controller.dart';
 import 'core/theme/font_manager.dart';
 import 'core/theme/theme_factory.dart';
+import 'ui/common/version_dialog.dart';
 import 'ui/common/wallpaper.dart';
 import 'ui/shell/root_shell.dart';
 
@@ -34,13 +37,39 @@ class AcheroApp extends StatelessWidget {
         ChangeNotifierProvider<FontManager>.value(value: services.fonts),
         ChangeNotifierProvider<DownloadManager>.value(value: services.downloads),
       ],
-      child: const _AppBuilder(),
+      child: _AppBuilder(prefs: services.prefs),
     );
   }
 }
 
-class _AppBuilder extends StatelessWidget {
-  const _AppBuilder();
+class _AppBuilder extends StatefulWidget {
+  const _AppBuilder({required this.prefs});
+
+  final SharedPreferences prefs;
+
+  @override
+  State<_AppBuilder> createState() => _AppBuilderState();
+}
+
+class _AppBuilderState extends State<_AppBuilder> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowChangelog());
+  }
+
+  /// 首次安装或版本升级后，自动弹出一次当前版本的更新日志；之后不再自动弹出。
+  Future<void> _maybeShowChangelog() async {
+    if (!mounted || !AppInfo.shouldAutoShow(widget.prefs)) return;
+    await AppInfo.markShown(widget.prefs);
+    if (!mounted) return;
+    final navigatorContext = _navigatorKey.currentContext;
+    if (navigatorContext != null && navigatorContext.mounted) {
+      await showVersionDialog(navigatorContext);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +86,7 @@ class _AppBuilder extends StatelessWidget {
     return MaterialApp(
       title: 'Achero Player',
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       theme: transparentScaffold(ThemeFactory.light(settings)),
       darkTheme: transparentScaffold(ThemeFactory.dark(settings)),
       themeMode: theme.brightness.themeMode,

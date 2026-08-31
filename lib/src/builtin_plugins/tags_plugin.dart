@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/models/track.dart';
 import '../core/plugins/plugin_types.dart';
+import '../ui/common/cover_art.dart';
 
 /// 内置插件：分类标签。
 ///
@@ -17,7 +18,7 @@ class TagsPlugin extends AcheroPlugin {
   String get name => '分类标签';
 
   @override
-  String get version => '1.0.5';
+  String get version => '1.1.1';
 
   @override
   String get description => '为曲目打标签并按标签浏览曲库。';
@@ -88,6 +89,25 @@ class TagsPlugin extends AcheroPlugin {
     await _persist();
   }
 
+  /// 批量把若干曲目加入标签（幂等，已存在则跳过）。
+  Future<void> addTagToTracks(String tag, List<String> trackIds) async {
+    final info = _tags.value[tag];
+    if (info == null) return;
+    final ids = List<String>.from(info.trackIds);
+    var changed = false;
+    for (final id in trackIds) {
+      if (!ids.contains(id)) {
+        ids.add(id);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    final next = Map<String, _TagInfo>.from(_tags.value);
+    next[tag] = _TagInfo(info.color, ids);
+    _tags.value = next;
+    await _persist();
+  }
+
   Future<void> _persist() async {
     await _context?.prefs.setString(
       _storageKey,
@@ -137,6 +157,9 @@ class _TagsPageState extends State<_TagsPage> {
   String? _selected;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  final Set<String> _selectedTracks = {};
+
+  bool get _selectionMode => _selectedTracks.isNotEmpty;
 
   static const List<int> _palette = [
     0xFF0984E3, 0xFFE84393, 0xFF00B894, 0xFFE17055,
@@ -235,6 +258,12 @@ class _TagsPageState extends State<_TagsPage> {
                 ],
               ),
             ),
+            if (_selectionMode)
+              _TagSelectionBar(
+                count: _selectedTracks.length,
+                onClose: () => setState(_selectedTracks.clear),
+                onBatchTag: () => _batchTag(filtered),
+              ),
             Expanded(
               child: filtered.isEmpty
                   ? const Center(child: Text('没有曲目'))
@@ -243,19 +272,54 @@ class _TagsPageState extends State<_TagsPage> {
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final track = filtered[index];
-                        return ListTile(
-                          leading: const Icon(Icons.music_note),
+                        final selected = _selectedTracks.contains(track.id);
+                        final tile = ListTile(
+                          leading: _selectionMode
+                              ? Icon(
+                                  selected
+                                      ? Icons.check_circle
+                                      : Icons.radio_button_unchecked,
+                                  color: selected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                )
+                              : SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: CoverArt(
+                                        track: track,
+                                        borderRadius: 8,
+                                        iconSize: 20),
+                                  ),
+                                ),
                           title: Text(track.title,
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                           subtitle: Text(track.artist ?? '',
                               maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: IconButton(
-                            tooltip: '打标签',
-                            icon: const Icon(Icons.label_outline),
-                            onPressed: () => _pickTag(track),
-                          ),
-                          onTap: () => widget.plugin._context?.player
-                              .playQueue(filtered, startIndex: index),
+                          trailing: _selectionMode
+                              ? null
+                              : IconButton(
+                                  tooltip: '打标签',
+                                  icon: const Icon(Icons.label_outline),
+                                  onPressed: () => _pickTag(track),
+                                ),
+                          onTap: _selectionMode
+                              ? () => _toggleTrack(track)
+                              : () => widget.plugin._context?.player
+                                  .playQueue(filtered, startIndex: index),
+                          onLongPress: _selectionMode
+                              ? null
+                              : () => _toggleTrack(track),
+                        );
+                        // 桌面端：右键等同于长按，进入/退出多选。
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onSecondaryTap: () => _toggleTrack(track),
+                          child: tile,
                         );
                       },
                     ),
@@ -264,6 +328,51 @@ class _TagsPageState extends State<_TagsPage> {
         );
       },
     );
+  }
+
+  void _toggleTrack(Track track) {
+    setState(() {
+      if (!_selectedTracks.add(track.id)) _selectedTracks.remove(track.id);
+    });
+  }
+
+  Future<void> _batchTag(List<Track> tracks) async {
+    final ids = tracks
+        .where((t) => _selectedTracks.contains(t.id))
+        .map((t) => t.id)
+        .toList(growable: false);
+    final tags = widget.plugin.tagNames;
+    if (tags.isEmpty) {
+      _toast('请先新建一个标签');
+      return;
+    }
+    final tag = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text('为 ${ids.length} 首曲目添加标签',
+                  style: Theme.of(context).textTheme.titleMedium),
+            ),
+            for (final t in tags)
+              ListTile(
+                leading: _Dot(color: widget.plugin.tagColor(t)),
+                title: Text(t),
+                onTap: () => Navigator.pop(context, t),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (tag != null) {
+      await widget.plugin.addTagToTracks(tag, ids);
+      if (mounted) setState(_selectedTracks.clear);
+    }
   }
 
   Future<void> _createTag() async {
@@ -405,6 +514,54 @@ class _TagsPageState extends State<_TagsPage> {
         content: Text(message),
         duration: const Duration(milliseconds: 1500),
       ));
+  }
+}
+
+class _TagSelectionBar extends StatelessWidget {
+  const _TagSelectionBar({
+    required this.count,
+    required this.onClose,
+    required this.onBatchTag,
+  });
+
+  final int count;
+  final VoidCallback onClose;
+  final VoidCallback onBatchTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: '退出多选',
+              icon: const Icon(Icons.close),
+              color: scheme.onPrimaryContainer,
+              onPressed: onClose,
+            ),
+            Expanded(
+              child: Text(
+                '已选 $count 首',
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: '打标签',
+              icon: const Icon(Icons.label_outline),
+              color: scheme.onPrimaryContainer,
+              onPressed: onBatchTag,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -98,11 +98,24 @@ class MusicLibrary extends ChangeNotifier {
     return imported;
   }
 
-  void removeTrack(String id) {
-    if (_byId.remove(id) == null) return;
+  void removeTrack(String id) => removeTracks([id]);
+
+  /// 批量从曲库移除曲目，并从所有播放列表中同步清理。
+  void removeTracks(Iterable<String> ids) {
+    final idSet = ids.toSet();
+    var removed = false;
+    for (final id in idSet) {
+      if (_byId.remove(id) != null) removed = true;
+    }
+    if (!removed) return;
     for (var i = 0; i < _playlists.length; i++) {
-      if (_playlists[i].trackIds.contains(id)) {
-        _playlists[i] = _playlists[i].removeTrack(id);
+      if (_playlists[i].trackIds.any(idSet.contains)) {
+        _playlists[i] = _playlists[i].copyWith(
+          trackIds: _playlists[i]
+              .trackIds
+              .where((id) => !idSet.contains(id))
+              .toList(growable: false),
+        );
       }
     }
     _persist();
@@ -175,11 +188,19 @@ class MusicLibrary extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addToPlaylist(String playlistId, String trackId) {
+  /// 批量把若干曲目加入播放列表（幂等：已存在的跳过）。
+  void addToPlaylist(String playlistId, Iterable<String> trackIds) {
     final index = _playlists.indexWhere((pl) => pl.id == playlistId);
-    if (index < 0 || _byId[trackId] == null) return;
-    final next = _playlists[index].addTrack(trackId);
-    if (identical(next, _playlists[index])) return;
+    if (index < 0) return;
+    var next = _playlists[index];
+    var changed = false;
+    for (final trackId in trackIds) {
+      if (_byId[trackId] == null) continue;
+      final before = next;
+      next = next.addTrack(trackId);
+      if (!identical(before, next)) changed = true;
+    }
+    if (!changed) return;
     _playlists[index] = next;
     _persist();
     notifyListeners();
@@ -201,7 +222,7 @@ class MusicLibrary extends ChangeNotifier {
     if (fav.trackIds.contains(trackId)) {
       removeFromPlaylist(fav.id, trackId);
     } else {
-      addToPlaylist(fav.id, trackId);
+      addToPlaylist(fav.id, [trackId]);
     }
   }
 

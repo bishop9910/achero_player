@@ -13,9 +13,12 @@ void main() {
   final statsSource = File('assets/plugins/statistics_plugin.dart').readAsStringSync();
   final statsPrefs = <String, String>{};
   final statsTracks = [
-    {'id': 't1', 'title': '海阔天空', 'artist': 'Beyond'},
-    {'id': 't2', 'title': '光辉岁月', 'artist': 'Beyond'},
-    {'id': 't3', 'title': '喜欢你', 'artist': 'Beyond'},
+    {'id': 't1', 'title': '海阔天空', 'artist': 'Beyond', 'album': '乐与怒'},
+    {'id': 't2', 'title': '光辉岁月', 'artist': 'Beyond', 'album': '命运派对'},
+    {'id': 't3', 'title': '喜欢你', 'artist': 'Beyond', 'album': '秘密警察'},
+  ];
+  final statsPlaylists = [
+    {'name': '我的最爱', 'trackIds': ['t1', 't2']},
   ];
 
   $Value? statsHost(Runtime rt, $Value? target, List<$Value?> args) {
@@ -29,6 +32,8 @@ void main() {
         return $null();
       case 'listTracks':
         return $String(jsonEncode(statsTracks));
+      case 'listPlaylists':
+        return $String(jsonEncode(statsPlaylists));
       default:
         throw StateError('unexpected method: $method');
     }
@@ -47,14 +52,18 @@ void main() {
   stats.invoke('onEvent', ['trackStarted', jsonEncode({'id': 't1', 'title': '海阔天空'})]);
   stats.invoke('onEvent', ['trackStarted', jsonEncode({'id': 't2', 'title': '光辉岁月'})]);
 
-  // 排序已移到宿主侧，脚本只负责返回带 sortValue 的行。
-  final rows = jsonDecode(stats.invoke('pageRows', ['desc']).toString()) as List<dynamic>;
-  assert(rows.length == 2, 'expected 2 rows, got ${rows.length}');
-  assert((rows[0] as Map)['title'] == '海阔天空');
-  assert((rows[0] as Map)['sortValue'] == 2);
-  assert((rows[1] as Map)['title'] == '光辉岁月');
-  assert((rows[1] as Map)['sortValue'] == 1);
-  print('[stats] pageRows OK (带 sortValue): $rows');
+  // 排序移到宿主侧；脚本返回「分组标题 + 带 sortValue 的行」。
+  final rows = (jsonDecode(stats.invoke('pageRows', ['desc']).toString()) as List<dynamic>)
+      .cast<Map>();
+  assert(rows.length == 8, 'expected 8 rows, got ${rows.length}');
+  assert(rows[0]['header'] == '单曲排行');
+  assert(rows[1]['title'] == '海阔天空' && rows[1]['sortValue'] == 2);
+  assert(rows[1]['trackId'] == 't1' && rows[1]['action'] == 'play:t1');
+  assert(rows[3]['header'] == '专辑排行');
+  assert(rows[4]['title'] == '乐与怒' && rows[4]['sortValue'] == 2);
+  assert(rows[6]['header'] == '播放列表排行');
+  assert(rows[7]['title'] == '我的最爱' && rows[7]['sortValue'] == 3);
+  print('[stats] pageRows OK (单曲/专辑/播放列表分组): $rows');
 
   // ── 主题预设插件 ────────────────────────────────────────────────────────
   final presetSource = File('assets/plugins/theme_presets_plugin.dart').readAsStringSync();

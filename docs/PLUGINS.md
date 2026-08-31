@@ -237,7 +237,7 @@ Future<void> onUnload() async {
 - `subsonic_plugin.dart` —— Subsonic/OpenSubsonic 源与缓存（见 `docs/SUBSONIC.md`）。
 
 运行时脚本插件（`assets/plugins/`，见 `docs/RUNTIME_PLUGINS.md`）：
-- `statistics_plugin.dart` —— 播放统计（事件 + 持久化 + 页面）。
+- `statistics_plugin.dart` —— 播放统计：单曲 / 专辑 / 播放列表三榜排行，封面预览、点击播放、多选。
 - `theme_presets_plugin.dart` —— 主题预设（设置区块 + 改主题）。
 
 ---

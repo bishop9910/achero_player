@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/download/download_manager.dart';
 import '../../core/library/library_catalog.dart';
 import '../../core/library/music_library.dart';
 import '../../core/models/track.dart';
@@ -8,6 +9,7 @@ import '../../core/player/player_controller.dart';
 import 'add_music.dart';
 import 'album_edit_page.dart';
 import 'category_pages.dart';
+import 'playlist_picker.dart';
 import 'track_tile.dart';
 
 /// 曲库页：按「歌曲 / 专辑 / 艺术家」浏览、搜索、播放本地音乐。
@@ -81,50 +83,210 @@ class _LibraryPageState extends State<LibraryPage> {
 // 歌曲分栏
 // ---------------------------------------------------------------------------
 
-class _SongsView extends StatelessWidget {
+class _SongsView extends StatefulWidget {
   const _SongsView({required this.query});
 
   final String query;
 
   @override
+  State<_SongsView> createState() => _SongsViewState();
+}
+
+class _SongsViewState extends State<_SongsView> {
+  final Set<String> _selected = {};
+
+  bool get _selectionMode => _selected.isNotEmpty;
+
+  @override
+  void didUpdateWidget(covariant _SongsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 搜索词变化后清空选择，避免选中了当前列表里看不到的曲目。
+    if (oldWidget.query != widget.query) _clearSelection();
+  }
+
+  void _toggle(Track track) {
+    setState(() {
+      if (!_selected.add(track.id)) _selected.remove(track.id);
+    });
+  }
+
+  void _clearSelection() => setState(_selected.clear);
+
+  @override
   Widget build(BuildContext context) {
     final library = context.watch<MusicLibrary>();
     final player = context.watch<PlayerController>();
-    final tracks = _filterSongs(library.tracks, query);
+    final tracks = _filterSongs(library.tracks, widget.query);
 
     if (tracks.isEmpty) {
-      return _EmptyLibrary(query: query, hasAny: library.trackCount > 0);
+      return _EmptyLibrary(
+          query: widget.query, hasAny: library.trackCount > 0);
     }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: tracks.length,
-      itemBuilder: (context, index) {
-        final track = tracks[index];
-        return TrackTile(
-          track: track,
-          index: index,
-          isCurrent: player.currentTrack?.id == track.id,
-          isPlaying:
-              player.currentTrack?.id == track.id && player.isPlaying,
-          onTap: () => player.playQueue(tracks, startIndex: index),
-          onRemove: () => library.removeTrack(track.id),
-        );
-      },
+
+    return Column(
+      children: [
+        if (_selectionMode)
+          _SelectionBar(
+            count: _selected.length,
+            onClose: _clearSelection,
+            onAddToPlaylist: () => _addToPlaylist(context, tracks),
+            onDownload: () => _download(context, tracks),
+            onRemove: () => _remove(context, tracks),
+          ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: tracks.length,
+            itemBuilder: (context, index) {
+              final track = tracks[index];
+              return TrackTile(
+                track: track,
+                index: index,
+                isCurrent: player.currentTrack?.id == track.id,
+                isPlaying:
+                    player.currentTrack?.id == track.id && player.isPlaying,
+                selectionMode: _selectionMode,
+                selected: _selected.contains(track.id),
+                onSelectedChanged: () => _toggle(track),
+                // 长按 / 右键进入/退出多选（与点击选择一致）。
+                onLongPress: () => _toggle(track),
+                onTap: () => player.playQueue(tracks, startIndex: index),
+                onRemove: () => library.removeTrack(track.id),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  static List<Track> _filterSongs(List<Track> all, String query) {
-    final list = [...all]
-      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return list;
-    return list
-        .where((t) =>
-            t.title.toLowerCase().contains(q) ||
-            (t.artist?.toLowerCase().contains(q) ?? false) ||
-            (t.album?.toLowerCase().contains(q) ?? false))
-        .toList(growable: false);
+  List<String> _selectedIds(List<Track> tracks) => tracks
+      .where((t) => _selected.contains(t.id))
+      .map((t) => t.id)
+      .toList(growable: false);
+
+  Future<void> _addToPlaylist(BuildContext context, List<Track> tracks) async {
+    await showAddToPlaylistSheet(context, _selectedIds(tracks));
+    if (mounted) _clearSelection();
   }
+
+  Future<void> _download(BuildContext context, List<Track> tracks) async {
+    final downloads = context.read<DownloadManager>();
+    final selected =
+        tracks.where((t) => _selected.contains(t.id)).toList(growable: false);
+    final started = await downloads.downloadAll(selected);
+    if (mounted && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            started > 0 ? '已开始下载 $started 首' : '无法下载：缺少缓存或服务器地址'),
+        duration: const Duration(milliseconds: 1500),
+      ));
+      _clearSelection();
+    }
+  }
+
+  Future<void> _remove(BuildContext context, List<Track> tracks) async {
+    final library = context.read<MusicLibrary>();
+    final count = _selected.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('从曲库移除'),
+        content: Text('确定要移除选中的 $count 首曲目吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      library.removeTracks(_selectedIds(tracks));
+      if (mounted) _clearSelection();
+    }
+  }
+}
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.onClose,
+    required this.onAddToPlaylist,
+    required this.onDownload,
+    required this.onRemove,
+  });
+
+  final int count;
+  final VoidCallback onClose;
+  final VoidCallback onAddToPlaylist;
+  final VoidCallback onDownload;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: '退出多选',
+              icon: const Icon(Icons.close),
+              color: scheme.onPrimaryContainer,
+              onPressed: onClose,
+            ),
+            Expanded(
+              child: Text(
+                '已选 $count 首',
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: '添加到歌单',
+              icon: const Icon(Icons.playlist_add),
+              color: scheme.onPrimaryContainer,
+              onPressed: onAddToPlaylist,
+            ),
+            IconButton(
+              tooltip: '下载',
+              icon: const Icon(Icons.download_outlined),
+              color: scheme.onPrimaryContainer,
+              onPressed: onDownload,
+            ),
+            IconButton(
+              tooltip: '从曲库移除',
+              icon: const Icon(Icons.delete_outline),
+              color: scheme.onPrimaryContainer,
+              onPressed: onRemove,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+List<Track> _filterSongs(List<Track> all, String query) {
+  final list = [...all]
+    ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return list;
+  return list
+      .where((t) =>
+          t.title.toLowerCase().contains(q) ||
+          (t.artist?.toLowerCase().contains(q) ?? false) ||
+          (t.album?.toLowerCase().contains(q) ?? false))
+      .toList(growable: false);
 }
 
 // ---------------------------------------------------------------------------

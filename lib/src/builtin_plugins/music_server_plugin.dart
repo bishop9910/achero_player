@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../core/cache/cache_manager.dart';
 import '../core/models/track.dart';
 import '../core/plugins/plugin_types.dart';
+import '../core/rpc/download.dart';
 import '../core/rpc/music_server_client.dart';
 import '../core/util/stable_id.dart';
 import '../ui/settings/cache_settings_section.dart';
@@ -29,7 +30,7 @@ class MusicServerPlugin extends AcheroPlugin {
   String get name => '音乐服务器';
 
   @override
-  String get version => '1.3.0';
+  String get version => '1.3.2';
 
   @override
   String get description => '通过 RPC 音乐服务器添加并缓存流式播放曲目。';
@@ -385,10 +386,24 @@ class _ServerPageState extends State<_ServerPage> {
       source = UrlTrackSource(url);
     }
 
-    // 封面只在「下载」时缓存；添加时若已缓存则复用，否则走网络地址，保证添加最快。
-    final coverPath = (cache != null && await cache.hasCover(remote.id))
+    // 封面：添加时即尽力缓存到本地（封面体积小，不拖慢「添加」），
+    // 失败则回退网络地址；已缓存则直接复用，保证离线也能显示封面。
+    String? coverPath = (cache != null && await cache.hasCover(remote.id))
         ? cache.coverPath(remote.id)
         : null;
+    if (coverPath == null &&
+        cache != null &&
+        remote.coverUrl != null &&
+        remote.coverUrl!.isNotEmpty) {
+      try {
+        final bytes = await downloadCover(Uri.parse(remote.coverUrl!));
+        if (bytes != null) {
+          coverPath = await cache.putCover(remote.id, bytes);
+        }
+      } catch (_) {
+        // 封面缓存失败不影响添加，回退到在线封面。
+      }
+    }
     return _makeTrack(remote, client, source, metadata,
         coverPath: coverPath, remoteUrl: url);
   }

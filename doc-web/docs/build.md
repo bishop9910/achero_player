@@ -29,6 +29,9 @@ flutter build windows --release
 - **CMake 4 / VS 2026 补丁**：`third_party\media_kit_libs_windows_audio` +
   `pubspec.yaml` 里的 `dependency_overrides` 仍是必需的，待 media_kit 上游
   适配后再删。
+- **Rust 工具链（smtc_windows）**：SMTC 系统媒体条由 Rust 插件 `smtc_windows`
+  提供，构建前需安装 rustup（含 cargo/rustc），且 `third_party\smtc_windows`
+  本地补丁仍是必需的。缺 Rust 会报 `MSB8066`（smtc_windows 自定义生成退出码 -1）。
 - 上微软商店需额外打包为 MSIX（可选）。
 
 ---

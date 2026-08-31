@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../core/cache/cache_manager.dart';
 import '../core/models/track.dart';
 import '../core/plugins/plugin_types.dart';
+import '../core/rpc/download.dart';
 import '../core/rpc/subsonic_client.dart';
 import '../core/util/stable_id.dart';
 import '../ui/settings/cache_settings_section.dart';
@@ -26,7 +27,7 @@ class SubsonicPlugin extends AcheroPlugin {
   String get name => 'Subsonic 服务器';
 
   @override
-  String get version => '1.3.0';
+  String get version => '1.3.2';
 
   @override
   String get description => '连接 Navidrome / Airsonic 等服务器，导入并缓存音乐。';
@@ -627,7 +628,7 @@ Future<SubsonicSearchResults> _cachedSearch(
 }
 
 /// 把歌曲转为可播放的 [Track]：**不下载音频**，命中缓存用本地文件，
-/// 否则在线流式（保证「导入」很快）。封面复用已缓存项。
+/// 否则在线流式（保证「导入」很快）。封面在导入时即尽力缓存到本地。
 Future<Track?> _buildTrack(
   SubsonicSong song,
   SubsonicClient client,
@@ -635,9 +636,22 @@ Future<Track?> _buildTrack(
 ) async {
   final ext = _audioExtension(song);
   final url = client.streamUri(song.id).toString();
-  final coverPath = (cache != null && await cache.hasCover(song.id))
+
+  String? coverPath = (cache != null && await cache.hasCover(song.id))
       ? cache.coverPath(song.id)
       : null;
+  if (coverPath == null && cache != null && song.coverArt != null) {
+    try {
+      final coverUrl = client.coverArtUri(song.coverArt!).toString();
+      final bytes = await downloadCover(Uri.parse(coverUrl));
+      if (bytes != null) {
+        coverPath = await cache.putCover(song.id, bytes);
+      }
+    } catch (_) {
+      // 封面缓存失败不影响导入，回退到在线封面。
+    }
+  }
+
   if (cache != null && await cache.hasAudio(song.id, ext)) {
     return _makeTrack(song, client, FileTrackSource(cache.audioPath(song.id, ext)),
         coverPath: coverPath, remoteUrl: url);
